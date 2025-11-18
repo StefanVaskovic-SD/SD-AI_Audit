@@ -25,6 +25,7 @@ const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GE
 // Middleware
 app.use(cors()); // Allow requests from frontend
 app.use(express.json({ limit: '50mb' })); // Parse JSON requests (increased for website content)
+app.use(express.static('.')); // Serve static files (including index.html)
 
 // Rate limiting (simple in-memory implementation)
 const requestCounts = new Map();
@@ -461,6 +462,11 @@ RESPOND WITH ONLY THE JSON OBJECT, NOTHING ELSE.`;
 
   return prompt;
 }
+
+// Serve index.html for root path
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/index.html');
+});
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
