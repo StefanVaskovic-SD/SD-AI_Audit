@@ -26,15 +26,22 @@ function checkRateLimit(ip) {
   return true;
 }
 
-// Simple fetch function
+// Simple fetch function with timeout
 async function fetchWebsiteSimple(url) {
   try {
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
-      }
+      },
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -58,29 +65,32 @@ async function fetchWebsiteSimple(url) {
                $(el).text().toLowerCase().includes('buy') ||
                $(el).text().toLowerCase().includes('sign up') ||
                $(el).text().toLowerCase().includes('contact')
-      })).get().slice(0, 50),
+      })).get().slice(0, 30), // Reduced from 50 to 30
       images: $('img').map((i, el) => ({
         src: $(el).attr('src'),
         alt: $(el).attr('alt') || '',
         title: $(el).attr('title') || ''
-      })).get().slice(0, 30),
+      })).get().slice(0, 20), // Reduced from 30 to 20
       forms: $('form').length,
       buttons: $('button, input[type="submit"], input[type="button"]').map((i, el) => ({
         text: $(el).text() || $(el).attr('value') || '',
         type: $(el).attr('type') || 'button'
       })).get(),
-      textContent: $('body').text().replace(/\s+/g, ' ').trim().substring(0, 50000)
+      textContent: $('body').text().replace(/\s+/g, ' ').trim().substring(0, 20000) // Reduced from 50k to 20k chars
     };
     
     return {
       url,
-      html: html.substring(0, 200000),
+      html: html.substring(0, 50000), // Reduced from 200k to 50k chars
       structuredData,
       screenshot: null,
       elementScreenshots: null,
       fetchedAt: new Date().toISOString()
     };
   } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('Website fetch timeout - website took too long to respond');
+    }
     throw new Error(`Simple fetch failed: ${error.message}`);
   }
 }
@@ -105,7 +115,7 @@ H1: ${websiteContent.structuredData.headings.h1.join(', ')}
 H2: ${websiteContent.structuredData.headings.h2.slice(0, 10).join(', ')}
 H3: ${websiteContent.structuredData.headings.h3.slice(0, 10).join(', ')}
 
-TEXT CONTENT (first 50,000 characters):
+TEXT CONTENT (first 20,000 characters):
 ${websiteContent.structuredData.textContent}
 
 IMAGES FOUND: ${websiteContent.structuredData.images.length} images
@@ -117,8 +127,8 @@ CTAs: ${websiteContent.structuredData.links.filter(l => l.isCTA).length}
 FORMS: ${websiteContent.structuredData.forms}
 BUTTONS: ${websiteContent.structuredData.buttons.length}
 
-HTML STRUCTURE (sample):
-${websiteContent.html.substring(0, 10000)}
+HTML STRUCTURE (sample - first 5,000 chars):
+${websiteContent.html.substring(0, 5000)}
 
 AUDIT INSTRUCTIONS:
 THOROUGHLY examine ALL the provided content. Important considerations:
@@ -252,7 +262,7 @@ module.exports = async (req, res) => {
           temperature: 0.3,
           topK: 40,
           topP: 0.95,
-          maxOutputTokens: 16000,
+          maxOutputTokens: 8000, // Reduced from 16k to 8k for faster response
           responseMimeType: 'application/json',
         }
       });
