@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: ai-audit-backend
+    env: node
+    buildCommand: npm install
+    startCommand: node backend-server.js
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PORT
+        value: 10000
+
