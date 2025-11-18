@@ -1,0 +1,13 @@
+[build]
+  # Netlify will look for index.html in the root
+  publish = "."
+  
+[build.environment]
+  NODE_VERSION = "18"
+
+# Redirect all routes to index.html for SPA behavior
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
