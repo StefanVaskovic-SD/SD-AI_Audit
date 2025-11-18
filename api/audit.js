@@ -1,8 +1,6 @@
-// Vercel serverless function wrapper
-// This exports the Express app handler for Vercel
+// Vercel serverless function
+// This exports a handler function for Vercel
 
-const express = require('express');
-const cors = require('cors');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const cheerio = require('cheerio');
 
@@ -13,10 +11,6 @@ try {
 } catch (e) {
   console.warn('Puppeteer not available, will use simple fetch instead');
 }
-
-const app = express();
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
 
 // Initialize AI client
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
@@ -337,78 +331,93 @@ RESPOND WITH ONLY THE JSON OBJECT, NOTHING ELSE.`;
   return prompt;
 }
 
-// Audit endpoint
-app.post('/api/audit', async (req, res) => {
-  try {
-    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
-    
-    if (!checkRateLimit(ip)) {
-      return res.status(429).json({ error: 'Rate limit exceeded' });
-    }
-    
-    const { url, auditOptions, model = 'gemini-2.0-flash' } = req.body;
-    
-    if (!url || !auditOptions) {
-      return res.status(400).json({ error: 'URL and audit options are required' });
-    }
-    
-    if (!genAI) {
-      return res.status(500).json({ error: 'Gemini API key not configured' });
-    }
-    
-    const websiteContent = await fetchWebsiteContent(url);
-    const prompt = generateAuditPrompt(url, websiteContent, auditOptions);
-    
-    const modelName = model || 'gemini-2.0-flash';
-    const geminiModel = genAI.getGenerativeModel({ model: modelName });
-    
-    const result = await geminiModel.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.3,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 16000,
-        responseMimeType: 'application/json',
-      }
-    });
-    
-    let responseText = result.response.text();
-    responseText = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-    
-    let auditReport;
-    try {
-      auditReport = JSON.parse(responseText);
-    } catch (parseError) {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        auditReport = JSON.parse(jsonMatch[0]);
-      } else {
-        throw parseError;
-      }
-    }
-    
-    res.json({
-      success: true,
-      report: auditReport,
-      screenshot: websiteContent.screenshot || null,
-      elementScreenshots: websiteContent.elementScreenshots || null
-    });
-    
-  } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: 'Failed to generate audit', details: error.message });
+// Vercel serverless function handler
+module.exports = async (req, res) => {
+  // Handle CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
   }
-});
-
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    message: 'Backend server is running',
-    models: { gemini: !!process.env.GEMINI_API_KEY }
-  });
-});
-
-// Export for Vercel
-module.exports = app;
+  
+  // Get the path from URL (Vercel uses req.url)
+  const path = req.url || '';
+  
+  // Health check endpoint
+  if (req.method === 'GET' && (path === '/api/health' || path === '/health')) {
+    return res.json({ 
+      status: 'ok', 
+      message: 'Backend server is running',
+      models: { gemini: !!process.env.GEMINI_API_KEY }
+    });
+  }
+  
+  // Audit endpoint - handle both /api/audit and /audit
+  if (req.method === 'POST' && (path === '/api/audit' || path === '/audit' || path === '')) {
+    try {
+      const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+      
+      if (!checkRateLimit(ip)) {
+        return res.status(429).json({ error: 'Rate limit exceeded' });
+      }
+      
+      const { url, auditOptions, model = 'gemini-2.0-flash' } = req.body;
+      
+      if (!url || !auditOptions) {
+        return res.status(400).json({ error: 'URL and audit options are required' });
+      }
+      
+      if (!genAI) {
+        return res.status(500).json({ error: 'Gemini API key not configured' });
+      }
+      
+      const websiteContent = await fetchWebsiteContent(url);
+      const prompt = generateAuditPrompt(url, websiteContent, auditOptions);
+      
+      const modelName = model || 'gemini-2.0-flash';
+      const geminiModel = genAI.getGenerativeModel({ model: modelName });
+      
+      const result = await geminiModel.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.3,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 16000,
+          responseMimeType: 'application/json',
+        }
+      });
+      
+      let responseText = result.response.text();
+      responseText = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+      
+      let auditReport;
+      try {
+        auditReport = JSON.parse(responseText);
+      } catch (parseError) {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          auditReport = JSON.parse(jsonMatch[0]);
+        } else {
+          throw parseError;
+        }
+      }
+      
+      return res.json({
+        success: true,
+        report: auditReport,
+        screenshot: websiteContent.screenshot || null,
+        elementScreenshots: websiteContent.elementScreenshots || null
+      });
+      
+    } catch (error) {
+      console.error('Error:', error);
+      return res.status(500).json({ error: 'Failed to generate audit', details: error.message });
+    }
+  }
+  
+  // 404 for other routes
+  return res.status(404).json({ error: 'Not found' });
+};
