@@ -4,14 +4,6 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const cheerio = require('cheerio');
 
-// Try to load puppeteer
-let puppeteer;
-try {
-  puppeteer = require('puppeteer');
-} catch (e) {
-  console.warn('Puppeteer not available, will use simple fetch instead');
-}
-
 // Initialize AI client
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
@@ -93,134 +85,9 @@ async function fetchWebsiteSimple(url) {
   }
 }
 
-// Website fetching function
+// Website fetching function - uses simple fetch (Puppeteer removed for faster deployment)
 async function fetchWebsiteContent(url) {
-  if (puppeteer) {
-    let browser;
-    try {
-      browser = await puppeteer.launch({
-        headless: 'new',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu'
-        ],
-        timeout: 60000,
-        ignoreHTTPSErrors: true
-      });
-      
-      const page = await browser.newPage();
-      await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-      await page.setViewport({ width: 1920, height: 1080 });
-      
-      try {
-        await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
-      } catch (navError) {
-        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      await page.evaluate(async () => {
-        await new Promise((resolve) => {
-          let totalHeight = 0;
-          const distance = 100;
-          const timer = setInterval(() => {
-            const scrollHeight = document.body.scrollHeight;
-            window.scrollBy(0, distance);
-            totalHeight += distance;
-            if(totalHeight >= scrollHeight){
-              clearInterval(timer);
-              window.scrollTo(0, 0);
-              resolve();
-            }
-          }, 100);
-        });
-      });
-      
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const html = await page.content();
-      const title = await page.title();
-      
-      let screenshot = null;
-      try {
-        screenshot = await page.screenshot({ type: 'png', fullPage: true, encoding: 'base64' });
-      } catch (screenshotError) {
-        try {
-          screenshot = await page.screenshot({ type: 'png', encoding: 'base64' });
-        } catch (e) {}
-      }
-      
-      const elementScreenshots = {};
-      const selectors = ['form', 'button', 'input[type="submit"]', '.cta', '[class*="button"]', '[class*="form"]', 'nav', 'header'];
-      
-      for (const selector of selectors) {
-        try {
-          const elements = await page.$$(selector);
-          if (elements.length > 0) {
-            const elementScreenshot = await elements[0].screenshot({ type: 'png', encoding: 'base64' });
-            elementScreenshots[selector] = `data:image/png;base64,${elementScreenshot}`;
-          }
-        } catch (e) {}
-      }
-      
-      await browser.close();
-      
-      const $ = cheerio.load(html);
-      const structuredData = {
-        title: title || $('title').text() || 'No title',
-        metaDescription: $('meta[name="description"]').attr('content') || '',
-        headings: {
-          h1: $('h1').map((i, el) => $(el).text()).get(),
-          h2: $('h2').map((i, el) => $(el).text()).get(),
-          h3: $('h3').map((i, el) => $(el).text()).get(),
-        },
-        links: $('a').map((i, el) => ({
-          text: $(el).text().trim(),
-          href: $(el).attr('href'),
-          isCTA: $(el).text().toLowerCase().includes('click') || 
-                 $(el).text().toLowerCase().includes('buy') ||
-                 $(el).text().toLowerCase().includes('sign up') ||
-                 $(el).text().toLowerCase().includes('contact')
-        })).get().slice(0, 50),
-        images: $('img').map((i, el) => ({
-          src: $(el).attr('src'),
-          alt: $(el).attr('alt') || '',
-          title: $(el).attr('title') || ''
-        })).get().slice(0, 30),
-        forms: $('form').length,
-        buttons: $('button, input[type="submit"], input[type="button"]').map((i, el) => ({
-          text: $(el).text() || $(el).attr('value') || '',
-          type: $(el).attr('type') || 'button'
-        })).get(),
-        textContent: $('body').text().replace(/\s+/g, ' ').trim().substring(0, 50000)
-      };
-      
-      return {
-        url,
-        html: html.substring(0, 200000),
-        structuredData,
-        screenshot: screenshot ? `data:image/png;base64,${screenshot}` : null,
-        elementScreenshots: Object.keys(elementScreenshots).length > 0 ? elementScreenshots : null,
-        fetchedAt: new Date().toISOString()
-      };
-      
-    } catch (puppeteerError) {
-      if (browser) {
-        try {
-          await browser.close();
-        } catch (e) {}
-      }
-      return await fetchWebsiteSimple(url);
-    }
-  } else {
-    return await fetchWebsiteSimple(url);
-  }
+  return await fetchWebsiteSimple(url);
 }
 
 // Generate audit prompt based on selected options
