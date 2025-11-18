@@ -388,21 +388,44 @@ IMPORTANT:
           });
 
           if (!auditResponse.ok) {
+            // Clone response to read it multiple times if needed
+            const errorResponse = auditResponse.clone();
             let errorData;
             try {
-              errorData = await auditResponse.json();
+              errorData = await errorResponse.json();
             } catch (e) {
-              const errorText = await auditResponse.text();
-              errorData = { error: errorText };
+              try {
+                const errorText = await auditResponse.text();
+                errorData = { error: errorText };
+              } catch (textError) {
+                errorData = { error: `API request failed with status ${auditResponse.status}` };
+              }
             }
             console.error('API Error:', errorData);
             throw new Error(errorData.error || `API request failed with status ${auditResponse.status}. Please check that the backend server is running.`);
           }
 
           const auditData = await auditResponse.json();
-          let auditText = auditData.content[0].text;
           
-          console.log('Raw response:', auditText);
+          // Handle response format: { success: true, report: {...} }
+          let auditJson;
+          if (auditData.report) {
+            // New format - report is already parsed JSON object
+            auditJson = auditData.report;
+          } else if (auditData.content && auditData.content[0] && auditData.content[0].text) {
+            // Old format - parse JSON from text
+            let auditText = auditData.content[0].text;
+            auditText = auditText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+            const jsonMatch = auditText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              auditText = jsonMatch[0];
+            }
+            auditJson = JSON.parse(auditText);
+          } else {
+            throw new Error('Unexpected response format from server');
+          }
+          
+          console.log('Parsed audit report:', auditJson);
           
           // Save screenshots if available
           if (auditData.screenshot) {
@@ -416,17 +439,6 @@ IMPORTANT:
           } else {
             setElementScreenshots(null);
           }
-          
-          // Clean up the response if it has markdown code blocks or extra text
-          auditText = auditText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-          
-          // Try to find JSON in the response if there's extra text
-          const jsonMatch = auditText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            auditText = jsonMatch[0];
-          }
-          
-          const auditJson = JSON.parse(auditText);
           
           // Validate the structure
           if (!auditJson.categories || !Array.isArray(auditJson.categories)) {
@@ -445,6 +457,10 @@ IMPORTANT:
             errorMessage = 'Failed to connect to the backend server. Please make sure the backend is running on ' + backendUrl + '. Run "npm start" in the project directory.';
           } else if (err.message.includes('Failed to fetch website')) {
             errorMessage = 'Failed to fetch the website. Please check the URL and try again.';
+          } else if (err.message.includes('504') || err.message.includes('Gateway Timeout') || err.message.includes('timeout')) {
+            errorMessage = 'Request timed out. The analysis is taking too long. This might be due to a large website or slow response. Please try again or try a smaller website.';
+          } else if (err.message.includes('body stream already read')) {
+            errorMessage = 'Network error occurred. Please try again.';
           }
           
           setError(errorMessage);
