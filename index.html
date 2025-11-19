@@ -70,50 +70,60 @@
       const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
       const [backendUrl, setBackendUrl] = useState('https://sd-ai-audit.onrender.com');
 
-      // Define all audit categories and their checkboxes
-      const [auditOptions, setAuditOptions] = useState({
+      // Store default prompts for reset functionality
+      const getDefaultAuditOptions = () => ({
         userJourneys: {
           title: 'Mapping of the existing user journeys',
           items: {
             criticalJourneys: {
               label: 'Identify the most critical user journeys (based on business goals and user frequency)',
               checked: true,
+              prompt: 'Based on the main CTAs on the website, determine business goals. For example, if the CTA is Book a demo consider this as a business goal. If there\'s a form for the website visitor to populate, consider that action as another business goal',
             },
             userTypes: {
               label: 'Consider different user types',
               checked: true,
+              prompt: 'Based on the content on the website, make a conclusion who is the target persona. If this can\'t be concluded, state in your answer that this is your assumption based on the content.',
             },
             painPoints: {
               label: 'Pain Points: Friction, confusion, unnecessary steps, dead ends',
               checked: true,
+              prompt: 'Discover opportunities for improvement. Look into friction, confusing content, unnecessary steps, dead ends and similar things that could prevent the website visitor to continue user journey',
             },
             happyPath: {
               label: 'Map both happy path and alternative/edge case scenarios',
               checked: true,
+              prompt: 'This relates to the previous point Identify the most critical user journeys. It might not be relevant for the presentational websites, but in the cases when there\'s a contact form, register flow, scheduling meeting flow etc it\'s important to observe what if something opposit to the happy flow happens.',
             },
             dropOffRisks: {
               label: 'Drop-off Risks: Where users are likely to abandon the flow',
               checked: true,
+              prompt: 'Try to find obvious reasons for the user to abandon the flow (for example: too complex forms that require a lot of info to be provided from the user, payment required at certain step etc)',
             },
             cognitiveLoad: {
               label: 'Cognitive Load: Mental effort required at each step',
               checked: true,
+              prompt: 'In this aspect of the audit observe content primary and see how difficult for the user is to understand key messages.',
             },
             errorHandling: {
               label: 'Error Handling: What happens when things go wrong',
               checked: true,
+              prompt: 'This might not be relevant for presentational websites, but in the cases when there\'s a contact form, register flow, scheduling meeting flow etc it\'s important to observe how errors are handeled.',
             },
             efficiency: {
               label: 'Efficiency: Time and effort required to complete tasks',
               checked: true,
+              prompt: 'In this aspect of the audit observe content primary and see how difficult for the user to take actions to go throuh the flow and achieve business goals.',
             },
             userEmotions: {
               label: 'User emotions and frustrations at different stages',
               checked: true,
+              prompt: 'Observe user personas and user joerneys they could take in the context of conversion funnel Awareness → Interest → Consideration → Action and point out where are opportunities for improvements in order to convert',
             },
             mobileVsDesktop: {
               label: 'Mobile vs. desktop experience differences',
               checked: true,
+              prompt: 'Go through the webiste on desktop and mobile and point out main areas for improvement considering the points above',
             },
           },
         },
@@ -123,38 +133,47 @@
             navigation: {
               label: 'Navigation & Information Architecture',
               checked: true,
+              prompt: '',
             },
             ctaPlacement: {
               label: 'Call-to-action placement and clarity',
               checked: true,
+              prompt: '',
             },
             hoverStates: {
               label: 'Hover states and interactive elements behaviour',
               checked: true,
+              prompt: '',
             },
             interactions: {
               label: 'Interactions / animations assessment',
               checked: true,
+              prompt: '',
             },
             touchTargets: {
               label: 'Touch target sizing for mobile users',
               checked: true,
+              prompt: '',
             },
             conversionPaths: {
               label: 'Primary conversion paths (contact, purchase, signup)',
               checked: true,
+              prompt: '',
             },
             trustElements: {
               label: 'Trust & Credibility Elements',
               checked: true,
+              prompt: '',
             },
             loadingStates: {
               label: 'Loading states and progress indicators',
               checked: true,
+              prompt: '',
             },
             filterSorting: {
               label: 'Filter and sorting patterns',
               checked: true,
+              prompt: '',
             },
           },
         },
@@ -164,38 +183,47 @@
             messageClarity: {
               label: 'Message clarity and value proposition communication',
               checked: true,
+              prompt: '',
             },
             contentRelevance: {
               label: 'Content relevance to target audience and user needs',
               checked: true,
+              prompt: '',
             },
             writingQuality: {
               label: 'Writing quality, grammar, and professional tone',
               checked: true,
+              prompt: '',
             },
             imageQuality: {
               label: 'Image quality, relevance, and professional appearance',
               checked: true,
+              prompt: '',
             },
             engagingOpening: {
               label: 'Engaging opening that hooks the reader immediately',
               checked: true,
+              prompt: '',
             },
             logicalProgression: {
               label: 'Logical content progression that guides users through a journey',
               checked: true,
+              prompt: '',
             },
             sufficientDetail: {
               label: 'Sufficient detail to answer user questions and build confidence',
               checked: true,
+              prompt: '',
             },
             clearNextSteps: {
               label: 'Clear next steps or guidance on what to do after reading',
               checked: true,
+              prompt: '',
             },
             personalTouches: {
               label: 'Personal touches that build trust and connection',
               checked: true,
+              prompt: '',
             },
           },
         },
@@ -205,66 +233,84 @@
             textContrast: {
               label: 'Text contrast (WCAG AA: 4.5:1 for normal text, 3:1 for large text)',
               checked: true,
+              prompt: '',
             },
             nonTextContrast: {
               label: 'Non-text contrast (WCAG 2.1: 3:1 for UI components)',
               checked: true,
+              prompt: '',
             },
             placeholderText: {
               label: 'Placeholder text (must meet contrast ratio)',
               checked: true,
+              prompt: '',
             },
             focusIndicator: {
               label: 'Focus indicator (visible and clear, 3:1 contrast)',
               checked: true,
+              prompt: '',
             },
             targetSize: {
               label: 'Target size (clickable areas at least 24x24px)',
               checked: true,
+              prompt: '',
             },
             hoverOnlyInfo: {
               label: 'No hover-only info (must appear on focus/keyboard/tap)',
               checked: true,
+              prompt: '',
             },
             reflow: {
               label: 'Reflow (content reflows to 320px width without horizontal scrolling)',
               checked: true,
+              prompt: '',
             },
             zoom: {
               label: 'Zoom (UI scales up to 200% without breaking)',
               checked: true,
+              prompt: '',
             },
             spacing: {
               label: 'Spacing (line height, letter spacing allow overrides)',
               checked: true,
+              prompt: '',
             },
             colorAlone: {
               label: "Don't rely on color alone (status indicators need icon/label)",
               checked: true,
+              prompt: '',
             },
             links: {
               label: 'Links (distinguishable by underline, bold, etc.)',
               checked: true,
+              prompt: '',
             },
             states: {
               label: 'States (hover, active, disabled, focus visually distinct)',
               checked: true,
+              prompt: '',
             },
             labels: {
               label: 'Labels (all form fields have visible, persistent labels)',
               checked: true,
+              prompt: '',
             },
             errorMessages: {
               label: 'Error messages (clear, high-contrast, near relevant input)',
               checked: true,
+              prompt: '',
             },
             touchTargets: {
               label: 'Touch targets (enough spacing on mobile to avoid accidental taps)',
               checked: true,
+              prompt: '',
             },
           },
         },
       });
+
+      // Define all audit categories and their checkboxes
+      const [auditOptions, setAuditOptions] = useState(getDefaultAuditOptions());
 
       // Toggle individual checkbox
       const toggleCheckbox = (category, itemKey) => {
@@ -303,6 +349,23 @@
         }));
       };
 
+      // Update prompt for a specific item
+      const updatePrompt = (category, itemKey, newPrompt) => {
+        setAuditOptions(prev => ({
+          ...prev,
+          [category]: {
+            ...prev[category],
+            items: {
+              ...prev[category].items,
+              [itemKey]: {
+                ...prev[category].items[itemKey],
+                prompt: newPrompt,
+              },
+            },
+          },
+        }));
+      };
+
       // Generate AI prompt based on selected options
       const generateAuditPrompt = (websiteContent) => {
         let prompt = `You are an expert UX/UI auditor and web accessibility specialist. Analyze the following website and provide a comprehensive audit report.
@@ -322,7 +385,11 @@ Analyze ONLY the following checked items and provide detailed findings, issues, 
           if (checkedItems.length > 0) {
             prompt += `\n## ${category.title.toUpperCase()}\n`;
             checkedItems.forEach(([itemKey, item]) => {
-              prompt += `\n✓ ${item.label}\n`;
+              prompt += `\n✓ ${item.label}`;
+              if (item.prompt && item.prompt.trim()) {
+                prompt += `\n${item.prompt}`;
+              }
+              prompt += `\n`;
             });
           }
         });
@@ -800,19 +867,33 @@ IMPORTANT:
 
                       <div className="space-y-3 pl-9">
                         {Object.entries(category.items).map(([itemKey, item]) => (
-                          <div
-                            key={itemKey}
-                            className="flex items-start gap-3 cursor-pointer hover:bg-gray-700/30 p-2 rounded-lg transition-colors"
-                            onClick={() => toggleCheckbox(categoryKey, itemKey)}
-                          >
-                            {item.checked ? (
-                              <CheckSquare className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-                            ) : (
-                              <Square className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
+                          <div key={itemKey} className="space-y-2">
+                            <div
+                              className="flex items-start gap-3 cursor-pointer p-2 rounded-lg transition-colors hover:bg-white/10"
+                              onClick={() => toggleCheckbox(categoryKey, itemKey)}
+                            >
+                              {item.checked ? (
+                                <CheckSquare className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                              ) : (
+                                <Square className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                              )}
+                              <span className="text-gray-200 text-sm leading-relaxed">
+                                {item.label}
+                              </span>
+                            </div>
+                            {item.checked && (
+                              <div className="ml-8">
+                                <textarea
+                                  value={item.prompt || ''}
+                                  onChange={(e) => updatePrompt(categoryKey, itemKey, e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onFocus={(e) => e.stopPropagation()}
+                                  placeholder="Add custom prompt instructions for this item..."
+                                  className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-white placeholder-gray-500 text-sm resize-y min-h-[80px]"
+                                  style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}
+                                />
+                              </div>
                             )}
-                            <span className="text-gray-300 text-sm leading-relaxed">
-                              {item.label}
-                            </span>
                           </div>
                         ))}
                       </div>
