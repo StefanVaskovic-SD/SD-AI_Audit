@@ -690,6 +690,11 @@ Health check endpoint.
 # Required
 GEMINI_API_KEY=AIzaSyC-your-api-key-here
 
+# Optional - Google PageSpeed Insights API key (recommended for better mobile/accessibility analysis)
+# Get your free API key at: https://console.developers.google.com/
+# Enable "PageSpeed Insights API" in your project
+PSI_API_KEY=your-psi-api-key-here
+
 # Optional
 PORT=3001
 ```

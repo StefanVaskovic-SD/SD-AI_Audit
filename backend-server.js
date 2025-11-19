@@ -1110,6 +1110,107 @@ async function fetchWebsiteContent(url) {
   }
 }
 
+// Fetch Google PageSpeed Insights data
+async function fetchPageSpeedInsights(url) {
+  const psiApiKey = process.env.PSI_API_KEY;
+  
+  if (!psiApiKey) {
+    console.warn('PSI_API_KEY not set in environment variables. PageSpeed Insights data will not be available.');
+    return null;
+  }
+  
+  try {
+    console.log(`[${new Date().toISOString()}] Fetching PageSpeed Insights data for: ${url}`);
+    
+    // Fetch both mobile and desktop strategies
+    const [mobileResponse, desktopResponse] = await Promise.allSettled([
+      fetch(`https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${psiApiKey}&strategy=mobile&category=ACCESSIBILITY&category=PERFORMANCE`),
+      fetch(`https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${psiApiKey}&strategy=desktop&category=ACCESSIBILITY&category=PERFORMANCE`)
+    ]);
+    
+    const mobileData = mobileResponse.status === 'fulfilled' && mobileResponse.value.ok 
+      ? await mobileResponse.value.json() 
+      : null;
+    const desktopData = desktopResponse.status === 'fulfilled' && desktopResponse.value.ok 
+      ? await desktopResponse.value.json() 
+      : null;
+    
+    if (!mobileData && !desktopData) {
+      console.warn('PageSpeed Insights API returned no data');
+      return null;
+    }
+    
+    // Extract relevant data from PSI response
+    const extractPSIData = (psiResponse, strategy) => {
+      if (!psiResponse || !psiResponse.lighthouseResult) return null;
+      
+      const lhr = psiResponse.lighthouseResult;
+      const audits = lhr.audits || {};
+      const categories = lhr.categories || {};
+      
+      // Extract accessibility audits
+      const accessibilityAudits = {};
+      Object.keys(audits).forEach(key => {
+        const audit = audits[key];
+        if (audit.id && audit.id.startsWith('accessibility')) {
+          accessibilityAudits[audit.id] = {
+            title: audit.title,
+            description: audit.description,
+            score: audit.score,
+            displayValue: audit.displayValue,
+            details: audit.details
+          };
+        }
+      });
+      
+      // Extract performance metrics
+      const performanceMetrics = {};
+      const metricIds = ['first-contentful-paint', 'largest-contentful-paint', 'total-blocking-time', 'cumulative-layout-shift', 'speed-index'];
+      metricIds.forEach(id => {
+        if (audits[id]) {
+          performanceMetrics[id] = {
+            title: audits[id].title,
+            displayValue: audits[id].displayValue,
+            numericValue: audits[id].numericValue,
+            score: audits[id].score
+          };
+        }
+      });
+      
+      return {
+        strategy: strategy,
+        scores: {
+          performance: categories.performance?.score ? Math.round(categories.performance.score * 100) : null,
+          accessibility: categories.accessibility?.score ? Math.round(categories.accessibility.score * 100) : null,
+          bestPractices: categories['best-practices']?.score ? Math.round(categories['best-practices'].score * 100) : null,
+          seo: categories.seo?.score ? Math.round(categories.seo.score * 100) : null
+        },
+        accessibilityAudits: accessibilityAudits,
+        performanceMetrics: performanceMetrics,
+        finalUrl: lhr.finalUrl,
+        userAgent: lhr.userAgent,
+        // Extract mobile-specific rendering info
+        viewport: lhr.configSettings?.viewport || null,
+        emulatedFormFactor: lhr.configSettings?.emulatedFormFactor || null
+      };
+    };
+    
+    const result = {
+      mobile: extractPSIData(mobileData, 'mobile'),
+      desktop: extractPSIData(desktopData, 'desktop'),
+      fetchedAt: new Date().toISOString()
+    };
+    
+    console.log(`[${new Date().toISOString()}] PageSpeed Insights data extracted - Mobile Accessibility: ${result.mobile?.scores?.accessibility || 'N/A'}, Desktop Accessibility: ${result.desktop?.scores?.accessibility || 'N/A'}`);
+    
+    return result;
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] PageSpeed Insights fetch failed: ${error.message}`);
+    return null;
+  }
+}
+
 // Generate audit prompt based on selected options
 function generateAuditPrompt(url, websiteContent, auditOptions) {
   let prompt = `You are an expert UX/UI auditor and web accessibility specialist. Analyze the following website and provide a comprehensive audit report.
@@ -1290,6 +1391,53 @@ IMPORTANT MOBILE CONSIDERATIONS:
 - Viewport meta tag is critical for proper mobile rendering
 ` : '\n=== MOBILE VIEWPORT ANALYSIS ===\nMobile viewport data could not be captured. Please analyze based on desktop content only.\n'}
 
+${websiteContent.psiData ? `\n=== GOOGLE PAGESPEED INSIGHTS ANALYSIS ===
+This section contains real mobile and desktop performance/accessibility data from Google PageSpeed Insights API.
+
+MOBILE ANALYSIS (from PageSpeed Insights):
+${websiteContent.psiData.mobile ? `
+- Accessibility Score: ${websiteContent.psiData.mobile.scores.accessibility || 'N/A'}/100
+- Performance Score: ${websiteContent.psiData.mobile.scores.performance || 'N/A'}/100
+- Best Practices Score: ${websiteContent.psiData.mobile.scores.bestPractices || 'N/A'}/100
+- SEO Score: ${websiteContent.psiData.mobile.scores.seo || 'N/A'}/100
+- Emulated Form Factor: ${websiteContent.psiData.mobile.emulatedFormFactor || 'mobile'}
+- Final URL: ${websiteContent.psiData.mobile.finalUrl || url}
+
+ACCESSIBILITY AUDITS (Mobile):
+${Object.keys(websiteContent.psiData.mobile.accessibilityAudits || {}).length > 0 ? Object.entries(websiteContent.psiData.mobile.accessibilityAudits).slice(0, 30).map(([key, audit]) => {
+  const score = audit.score !== null ? (audit.score === 1 ? 'PASS' : audit.score === 0 ? 'FAIL' : `PARTIAL (${Math.round(audit.score * 100)}%)`) : 'N/A';
+  return `  - ${audit.title}: ${score}${audit.displayValue ? ` - ${audit.displayValue}` : ''}${audit.description ? `\n    Description: ${audit.description}` : ''}`;
+}).join('\n') : 'No accessibility audits available'}
+
+PERFORMANCE METRICS (Mobile):
+${Object.keys(websiteContent.psiData.mobile.performanceMetrics || {}).length > 0 ? Object.entries(websiteContent.psiData.mobile.performanceMetrics).map(([key, metric]) => {
+  return `  - ${metric.title}: ${metric.displayValue || 'N/A'} (Score: ${metric.score !== null ? Math.round(metric.score * 100) : 'N/A'})`;
+}).join('\n') : 'No performance metrics available'}
+` : 'Mobile PageSpeed Insights data not available'}
+
+DESKTOP ANALYSIS (from PageSpeed Insights):
+${websiteContent.psiData.desktop ? `
+- Accessibility Score: ${websiteContent.psiData.desktop.scores.accessibility || 'N/A'}/100
+- Performance Score: ${websiteContent.psiData.desktop.scores.performance || 'N/A'}/100
+- Best Practices Score: ${websiteContent.psiData.desktop.scores.bestPractices || 'N/A'}/100
+- SEO Score: ${websiteContent.psiData.desktop.scores.seo || 'N/A'}/100
+- Final URL: ${websiteContent.psiData.desktop.finalUrl || url}
+
+ACCESSIBILITY AUDITS (Desktop):
+${Object.keys(websiteContent.psiData.desktop.accessibilityAudits || {}).length > 0 ? Object.entries(websiteContent.psiData.desktop.accessibilityAudits).slice(0, 30).map(([key, audit]) => {
+  const score = audit.score !== null ? (audit.score === 1 ? 'PASS' : audit.score === 0 ? 'FAIL' : `PARTIAL (${Math.round(audit.score * 100)}%)`) : 'N/A';
+  return `  - ${audit.title}: ${score}${audit.displayValue ? ` - ${audit.displayValue}` : ''}${audit.description ? `\n    Description: ${audit.description}` : ''}`;
+}).join('\n') : 'No accessibility audits available'}
+` : 'Desktop PageSpeed Insights data not available'}
+
+IMPORTANT: Use PageSpeed Insights data to:
+- Validate and supplement accessibility findings (PSI provides real mobile accessibility audits)
+- Use mobile PSI data as the primary source for mobile-specific accessibility analysis
+- Compare PSI accessibility scores with your own analysis
+- Use PSI mobile rendering data to verify mobile viewport behavior
+- Cross-reference PSI accessibility audits with your findings for accuracy
+` : '\n=== GOOGLE PAGESPEED INSIGHTS ANALYSIS ===\nPageSpeed Insights data not available. To enable this feature, set PSI_API_KEY in your environment variables.\n'}
+
 AUDIT INSTRUCTIONS:
 THOROUGHLY examine ALL the provided content. Important considerations:
 - Many modern websites use lazy-loading, JavaScript rendering, and dynamic content
@@ -1378,6 +1526,9 @@ app.get('/api/health', (req, res) => {
     message: 'Backend server is running',
     models: {
       gemini: !!process.env.GEMINI_API_KEY
+    },
+    features: {
+      pageSpeedInsights: !!process.env.PSI_API_KEY
     }
   });
 });
@@ -1422,12 +1573,32 @@ app.post('/api/audit', async (req, res) => {
       console.log(`[Total custom prompts: ${customPromptCount}]`);
     }
 
-    // Step 1: Fetch website content
-    const websiteContent = await fetchWebsiteContent(url);
+    // Step 1: Fetch website content and PageSpeed Insights data in parallel
+    console.log(`[${new Date().toISOString()}] Starting website content fetch and PageSpeed Insights analysis...`);
+    const [websiteContent, psiData] = await Promise.allSettled([
+      fetchWebsiteContent(url),
+      fetchPageSpeedInsights(url)
+    ]);
+    
+    const content = websiteContent.status === 'fulfilled' ? websiteContent.value : null;
+    const psi = psiData.status === 'fulfilled' ? psiData.value : null;
+    
+    if (!content) {
+      throw new Error('Failed to fetch website content');
+    }
+    
+    // Merge PSI data into website content
+    if (psi) {
+      content.psiData = psi;
+      console.log(`[${new Date().toISOString()}] PageSpeed Insights data fetched successfully`);
+    } else {
+      console.warn(`[${new Date().toISOString()}] PageSpeed Insights data not available (API key may be missing or request failed)`);
+    }
+    
     console.log(`[${new Date().toISOString()}] Website content fetched`);
 
     // Step 2: Generate audit prompt
-    const prompt = generateAuditPrompt(url, websiteContent, auditOptions);
+    const prompt = generateAuditPrompt(url, content, auditOptions);
 
     // Step 3: Call AI model
     let response;
