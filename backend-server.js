@@ -261,10 +261,260 @@ async function fetchWebsiteContent(url) {
       
       console.log(`[${new Date().toISOString()}] Desktop content fetched successfully`);
       
+      // Extract comprehensive CSS and rendered HTML analysis for desktop
+      console.log(`[${new Date().toISOString()}] Extracting CSS and rendered HTML analysis...`);
+      let desktopCSSAnalysis = null;
+      try {
+        desktopCSSAnalysis = await page.evaluate(() => {
+          const getComputedStyle = (el, prop) => {
+            try {
+              return window.getComputedStyle(el).getPropertyValue(prop);
+            } catch (e) {
+              return '';
+            }
+          };
+          
+          const rgbToHex = (rgb) => {
+            if (!rgb || rgb === 'rgba(0, 0, 0, 0)' || rgb === 'transparent') return null;
+            const match = rgb.match(/\d+/g);
+            if (!match || match.length < 3) return null;
+            const r = parseInt(match[0]);
+            const g = parseInt(match[1]);
+            const b = parseInt(match[2]);
+            return '#' + [r, g, b].map(x => {
+              const hex = x.toString(16);
+              return hex.length === 1 ? '0' + hex : hex;
+            }).join('');
+          };
+          
+          const getContrastRatio = (color1, color2) => {
+            // Simplified contrast calculation - returns approximate ratio
+            // For accurate calculation, we'd need proper luminance calculation
+            return 'calculated_from_colors';
+          };
+          
+          // Analyze links
+          const links = [];
+          document.querySelectorAll('a').forEach((link, index) => {
+            if (index < 30) {
+              const styles = window.getComputedStyle(link);
+              const textDecoration = styles.textDecoration;
+              const fontWeight = styles.fontWeight;
+              const color = styles.color;
+              const backgroundColor = styles.backgroundColor;
+              
+              links.push({
+                text: link.textContent.trim().substring(0, 50),
+                href: link.getAttribute('href') || '',
+                hasUnderline: textDecoration.includes('underline'),
+                isBold: parseInt(fontWeight) >= 600 || fontWeight === 'bold',
+                color: color,
+                backgroundColor: backgroundColor,
+                fontSize: styles.fontSize,
+                isDistinguishable: textDecoration.includes('underline') || parseInt(fontWeight) >= 600 || color !== getComputedStyle(document.body, 'color')
+              });
+            }
+          });
+          
+          // Analyze form elements and error messages
+          const formElements = [];
+          const errorMessages = [];
+          document.querySelectorAll('input, select, textarea').forEach((input, index) => {
+            if (index < 20) {
+              const styles = window.getComputedStyle(input);
+              const placeholder = input.getAttribute('placeholder') || '';
+              const placeholderColor = input.matches(':placeholder-shown') ? styles.color : '';
+              
+              formElements.push({
+                type: input.type || input.tagName.toLowerCase(),
+                name: input.name || '',
+                id: input.id || '',
+                placeholder: placeholder,
+                placeholderColor: placeholderColor,
+                color: styles.color,
+                backgroundColor: styles.backgroundColor,
+                borderColor: styles.borderColor,
+                fontSize: styles.fontSize,
+                hasLabel: !!(input.labels && input.labels.length > 0) || !!(input.getAttribute('aria-label')) || !!(input.getAttribute('aria-labelledby'))
+              });
+              
+              // Look for error messages near this input
+              const parent = input.closest('form, div, fieldset');
+              if (parent) {
+                const errorElements = parent.querySelectorAll('[role="alert"], .error, .invalid, [aria-invalid="true"]');
+                errorElements.forEach(err => {
+                  const errStyles = window.getComputedStyle(err);
+                  errorMessages.push({
+                    inputType: input.type || input.tagName.toLowerCase(),
+                    message: err.textContent.trim().substring(0, 100),
+                    color: errStyles.color,
+                    backgroundColor: errStyles.backgroundColor,
+                    fontSize: errStyles.fontSize,
+                    isVisible: errStyles.display !== 'none' && errStyles.visibility !== 'hidden',
+                    isNearInput: true
+                  });
+                });
+              }
+            }
+          });
+          
+          // Analyze spacing (line-height, letter-spacing)
+          const spacingAnalysis = {
+            body: {
+              lineHeight: getComputedStyle(document.body, 'line-height'),
+              letterSpacing: getComputedStyle(document.body, 'letter-spacing'),
+              fontSize: getComputedStyle(document.body, 'font-size')
+            },
+            paragraphs: []
+          };
+          
+          document.querySelectorAll('p').forEach((p, index) => {
+            if (index < 10) {
+              spacingAnalysis.paragraphs.push({
+                lineHeight: getComputedStyle(p, 'line-height'),
+                letterSpacing: getComputedStyle(p, 'letter-spacing'),
+                fontSize: getComputedStyle(p, 'font-size')
+              });
+            }
+          });
+          
+          // Analyze button and interactive element states
+          const interactiveElements = [];
+          document.querySelectorAll('button, a, input[type="button"], input[type="submit"], [role="button"]').forEach((el, index) => {
+            if (index < 20) {
+              const normalStyles = window.getComputedStyle(el);
+              
+              // Try to get hover state (simulate by checking if :hover rule exists)
+              let hoverStyles = null;
+              try {
+                // Create a temporary element to check hover styles
+                const testEl = el.cloneNode(true);
+                testEl.style.position = 'absolute';
+                testEl.style.left = '-9999px';
+                document.body.appendChild(testEl);
+                // Note: Can't actually trigger hover in evaluate, but we can check computed styles
+                hoverStyles = {
+                  color: normalStyles.color,
+                  backgroundColor: normalStyles.backgroundColor,
+                  borderColor: normalStyles.borderColor
+                };
+                document.body.removeChild(testEl);
+              } catch (e) {
+                // Ignore
+              }
+              
+              // Check focus state
+              el.focus();
+              const focusStyles = window.getComputedStyle(el);
+              const focusOutline = focusStyles.outline;
+              const focusOutlineWidth = focusStyles.outlineWidth;
+              el.blur();
+              
+              interactiveElements.push({
+                tag: el.tagName.toLowerCase(),
+                text: el.textContent.trim().substring(0, 50),
+                normal: {
+                  color: normalStyles.color,
+                  backgroundColor: normalStyles.backgroundColor,
+                  borderColor: normalStyles.borderColor
+                },
+                focus: {
+                  outline: focusOutline,
+                  outlineWidth: focusOutlineWidth,
+                  hasVisibleFocus: focusOutline !== 'none' && focusOutlineWidth !== '0px'
+                },
+                disabled: el.disabled ? {
+                  color: normalStyles.color,
+                  opacity: normalStyles.opacity
+                } : null
+              });
+            }
+          });
+          
+          // Analyze color usage (check if color alone is used for status)
+          const colorOnlyIndicators = [];
+          document.querySelectorAll('[class*="status"], [class*="error"], [class*="success"], [class*="warning"]').forEach((el, index) => {
+            if (index < 15) {
+              const styles = window.getComputedStyle(el);
+              const hasIcon = el.querySelector('svg, img, [class*="icon"]');
+              const hasText = el.textContent.trim().length > 0;
+              const color = styles.color;
+              const backgroundColor = styles.backgroundColor;
+              
+              colorOnlyIndicators.push({
+                element: el.tagName.toLowerCase(),
+                text: el.textContent.trim().substring(0, 50),
+                hasIcon: !!hasIcon,
+                hasText: hasText,
+                reliesOnColorAlone: !hasIcon && !hasText && (color !== 'rgb(0, 0, 0)' || backgroundColor !== 'rgba(0, 0, 0, 0)'),
+                color: color,
+                backgroundColor: backgroundColor
+              });
+            }
+          });
+          
+          // Analyze non-text contrast (UI components)
+          const uiComponents = [];
+          document.querySelectorAll('button, input, select, [role="button"], [role="checkbox"], [role="radio"]').forEach((el, index) => {
+            if (index < 15) {
+              const styles = window.getComputedStyle(el);
+              const borderColor = styles.borderColor;
+              const backgroundColor = styles.backgroundColor;
+              
+              uiComponents.push({
+                element: el.tagName.toLowerCase(),
+                text: el.textContent.trim().substring(0, 30),
+                borderColor: borderColor,
+                backgroundColor: backgroundColor,
+                hasBorder: styles.borderWidth !== '0px'
+              });
+            }
+          });
+          
+          return {
+            links: {
+              total: document.querySelectorAll('a').length,
+              analyzed: links.length,
+              details: links
+            },
+            formElements: {
+              total: document.querySelectorAll('input, select, textarea').length,
+              analyzed: formElements.length,
+              details: formElements
+            },
+            errorMessages: {
+              total: errorMessages.length,
+              details: errorMessages
+            },
+            spacing: spacingAnalysis,
+            interactiveStates: {
+              total: interactiveElements.length,
+              details: interactiveElements
+            },
+            colorOnlyIndicators: {
+              total: colorOnlyIndicators.length,
+              details: colorOnlyIndicators
+            },
+            uiComponents: {
+              total: uiComponents.length,
+              details: uiComponents
+            }
+          };
+        });
+        
+        console.log(`[${new Date().toISOString()}] CSS analysis extracted successfully`);
+      } catch (cssError) {
+        console.warn(`[${new Date().toISOString()}] CSS analysis failed: ${cssError.message}`);
+        desktopCSSAnalysis = null;
+      }
+      
       // Now capture mobile viewport data
       console.log(`[${new Date().toISOString()}] Capturing mobile viewport data...`);
       let mobileData = null;
       try {
+        // Set mobile user agent first
+        await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1');
+        
         // Set mobile viewport (iPhone 12 Pro dimensions - common mobile size)
         await page.setViewport({ 
           width: 390, 
@@ -274,18 +524,27 @@ async function fetchWebsiteContent(url) {
           hasTouch: true
         });
         
-        // Set mobile user agent
-        await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1');
+        // Verify viewport was set
+        const viewportCheck = await page.evaluate(() => ({
+          width: window.innerWidth,
+          height: window.innerHeight
+        }));
+        console.log(`[${new Date().toISOString()}] Mobile viewport set: ${viewportCheck.width}x${viewportCheck.height}`);
         
         // Reload page with mobile viewport to ensure proper rendering
-        await page.reload({ waitUntil: 'networkidle0', timeout: 30000 }).catch(() => {
-          return page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
-        }).catch(() => {
-          console.warn('Mobile page reload failed, continuing with current state');
-        });
+        try {
+          await page.reload({ waitUntil: 'networkidle0', timeout: 45000 });
+        } catch (reloadError) {
+          console.warn('Mobile reload with networkidle0 failed, trying domcontentloaded:', reloadError.message);
+          try {
+            await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
+          } catch (reloadError2) {
+            console.warn('Mobile reload with domcontentloaded also failed, continuing:', reloadError2.message);
+          }
+        }
         
-        // Wait for mobile layout to stabilize
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Wait for mobile layout to stabilize - longer wait for CSS to apply
+        await new Promise(resolve => setTimeout(resolve, 3000));
         
         // Scroll to trigger lazy loading on mobile
         await page.evaluate(async () => {
@@ -313,7 +572,7 @@ async function fetchWebsiteContent(url) {
         const mobileHtml = await page.content();
         const $mobile = cheerio.load(mobileHtml);
         
-        // Extract mobile-specific accessibility data
+        // Extract mobile-specific accessibility data with comprehensive CSS analysis
         mobileData = await page.evaluate(() => {
           const getElementSize = (el) => {
             const rect = el.getBoundingClientRect();
@@ -441,7 +700,44 @@ async function fetchWebsiteContent(url) {
               bodyLineHeight: bodyLineHeight,
               meetsMinimum: bodyFontSize >= 16
             },
-            textContent: document.body.innerText.replace(/\s+/g, ' ').trim().substring(0, 30000)
+            textContent: document.body.innerText.replace(/\s+/g, ' ').trim().substring(0, 30000),
+            // Add mobile CSS analysis similar to desktop
+            cssAnalysis: (() => {
+              const getComputedStyle = (el, prop) => {
+                try {
+                  return window.getComputedStyle(el).getPropertyValue(prop);
+                } catch (e) {
+                  return '';
+                }
+              };
+              
+              // Analyze links on mobile
+              const links = [];
+              document.querySelectorAll('a').forEach((link, index) => {
+                if (index < 20) {
+                  const styles = window.getComputedStyle(link);
+                  links.push({
+                    text: link.textContent.trim().substring(0, 50),
+                    hasUnderline: styles.textDecoration.includes('underline'),
+                    isBold: parseInt(styles.fontWeight) >= 600,
+                    fontSize: styles.fontSize
+                  });
+                }
+              });
+              
+              // Analyze spacing on mobile
+              const spacing = {
+                body: {
+                  lineHeight: getComputedStyle(document.body, 'line-height'),
+                  letterSpacing: getComputedStyle(document.body, 'letter-spacing')
+                }
+              };
+              
+              return {
+                links: { total: document.querySelectorAll('a').length, details: links },
+                spacing: spacing
+              };
+            })()
           };
         });
         
@@ -470,8 +766,46 @@ async function fetchWebsiteContent(url) {
         console.log(`[Mobile] Touch targets: ${mobileData.touchTargets.compliant}/${mobileData.touchTargets.total} compliant`);
         
       } catch (mobileError) {
-        console.warn(`[${new Date().toISOString()}] Mobile viewport capture failed: ${mobileError.message}`);
-        mobileData = null;
+        console.error(`[${new Date().toISOString()}] Mobile viewport capture failed: ${mobileError.message}`);
+        console.error('Mobile error stack:', mobileError.stack);
+        // Try to capture at least basic mobile data even if detailed analysis fails
+        try {
+          const basicMobileData = await page.evaluate(() => {
+            return {
+              viewport: {
+                width: window.innerWidth,
+                height: window.innerHeight,
+                metaTag: document.querySelector('meta[name="viewport"]')?.getAttribute('content') || null,
+                hasViewportMeta: !!document.querySelector('meta[name="viewport"]')
+              },
+              touchTargets: {
+                total: document.querySelectorAll('button, a, input, select, textarea').length,
+                compliant: 0,
+                nonCompliant: []
+              },
+              spacing: { issues: [] },
+              responsive: { hasMobileMediaQueries: false, breakpoints: [] },
+              typography: {
+                bodyFontSize: parseInt(window.getComputedStyle(document.body).fontSize) || 16,
+                bodyLineHeight: parseFloat(window.getComputedStyle(document.body).lineHeight) || 1.5,
+                meetsMinimum: true
+              },
+              textContent: document.body.innerText.replace(/\s+/g, ' ').trim().substring(0, 10000),
+              structuredData: {
+                headings: { h1: [], h2: [], h3: [] },
+                buttons: [],
+                links: [],
+                forms: 0
+              },
+              html: document.documentElement.outerHTML.substring(0, 50000)
+            };
+          });
+          mobileData = basicMobileData;
+          console.log(`[${new Date().toISOString()}] Basic mobile data captured as fallback`);
+        } catch (fallbackError) {
+          console.error(`[${new Date().toISOString()}] Mobile fallback capture also failed: ${fallbackError.message}`);
+          mobileData = null;
+        }
       }
       
       // Close browser
@@ -484,6 +818,7 @@ async function fetchWebsiteContent(url) {
         url,
         html: html.substring(0, 200000),
         structuredData,
+        cssAnalysis: desktopCSSAnalysis,
         mobileData: mobileData,
         fetchedAt: new Date().toISOString()
       };
@@ -540,6 +875,49 @@ BUTTONS: ${websiteContent.structuredData.buttons.length}
 HTML STRUCTURE (sample):
 ${websiteContent.html.substring(0, 10000)}
 
+${websiteContent.cssAnalysis ? `\n=== DESKTOP CSS & RENDERED HTML ANALYSIS ===
+This section contains computed CSS styles and rendered HTML analysis for accurate accessibility assessment.
+
+LINK ANALYSIS (Distinguishability):
+- Total Links: ${websiteContent.cssAnalysis.links.total}
+- Analyzed: ${websiteContent.cssAnalysis.links.analyzed}
+${websiteContent.cssAnalysis.links.details.length > 0 ? `\nLink Details:\n${websiteContent.cssAnalysis.links.details.slice(0, 15).map(link => `  - "${link.text.substring(0, 40)}": ${link.hasUnderline ? 'Has underline' : 'No underline'}, ${link.isBold ? 'Bold' : 'Not bold'}, Color: ${link.color}, Font size: ${link.fontSize}, Distinguishable: ${link.isDistinguishable ? 'Yes' : 'No'}`).join('\n')}` : ''}
+
+FORM ELEMENTS & ERROR MESSAGES:
+- Total Form Elements: ${websiteContent.cssAnalysis.formElements.total}
+- Analyzed: ${websiteContent.cssAnalysis.formElements.analyzed}
+${websiteContent.cssAnalysis.formElements.details.length > 0 ? `\nForm Element Details:\n${websiteContent.cssAnalysis.formElements.details.slice(0, 10).map(el => `  - ${el.type} (${el.name || el.id || 'unnamed'}): Placeholder: "${el.placeholder}", Has label: ${el.hasLabel}, Color: ${el.color}, Background: ${el.backgroundColor}`).join('\n')}` : ''}
+- Error Messages Found: ${websiteContent.cssAnalysis.errorMessages.total}
+${websiteContent.cssAnalysis.errorMessages.details.length > 0 ? `\nError Message Details:\n${websiteContent.cssAnalysis.errorMessages.details.slice(0, 5).map(err => `  - For ${err.inputType}: "${err.message.substring(0, 50)}", Color: ${err.color}, Visible: ${err.isVisible}`).join('\n')}` : ''}
+
+SPACING ANALYSIS (Line-height, Letter-spacing):
+Body:
+- Line-height: ${websiteContent.cssAnalysis.spacing.body.lineHeight}
+- Letter-spacing: ${websiteContent.cssAnalysis.spacing.body.letterSpacing}
+- Font-size: ${websiteContent.cssAnalysis.spacing.body.fontSize}
+${websiteContent.cssAnalysis.spacing.paragraphs.length > 0 ? `\nParagraph Samples:\n${websiteContent.cssAnalysis.spacing.paragraphs.slice(0, 5).map((p, i) => `  Paragraph ${i + 1}: Line-height: ${p.lineHeight}, Letter-spacing: ${p.letterSpacing}, Font-size: ${p.fontSize}`).join('\n')}` : ''}
+
+INTERACTIVE ELEMENT STATES (Hover, Focus, Active, Disabled):
+- Total Analyzed: ${websiteContent.cssAnalysis.interactiveStates.total}
+${websiteContent.cssAnalysis.interactiveStates.details.length > 0 ? `\nElement State Details:\n${websiteContent.cssAnalysis.interactiveStates.details.slice(0, 10).map(el => `  - ${el.tag} "${el.text.substring(0, 30)}": Focus outline: ${el.focus.outline}, Has visible focus: ${el.focus.hasVisibleFocus}, Disabled: ${el.disabled ? 'Yes' : 'No'}`).join('\n')}` : ''}
+
+COLOR-ONLY INDICATORS (Status indicators that rely on color alone):
+- Total Found: ${websiteContent.cssAnalysis.colorOnlyIndicators.total}
+${websiteContent.cssAnalysis.colorOnlyIndicators.details.length > 0 ? `\nColor-Only Indicator Details:\n${websiteContent.cssAnalysis.colorOnlyIndicators.details.slice(0, 10).map(ind => `  - ${ind.element} "${ind.text.substring(0, 30)}": Has icon: ${ind.hasIcon}, Has text: ${ind.hasText}, Relies on color alone: ${ind.reliesOnColorAlone ? 'YES (ISSUE)' : 'No'}, Color: ${ind.color}`).join('\n')}` : ''}
+
+NON-TEXT CONTRAST (UI Components):
+- Total UI Components Analyzed: ${websiteContent.cssAnalysis.uiComponents.total}
+${websiteContent.cssAnalysis.uiComponents.details.length > 0 ? `\nUI Component Details:\n${websiteContent.cssAnalysis.uiComponents.details.slice(0, 10).map(comp => `  - ${comp.element} "${comp.text.substring(0, 30)}": Border color: ${comp.borderColor}, Background: ${comp.backgroundColor}, Has border: ${comp.hasBorder}`).join('\n')}` : ''}
+
+IMPORTANT: Use this CSS analysis data to provide accurate assessments for:
+- Link distinguishability (underline, bold, color)
+- Form element labels and error messages
+- Spacing (line-height, letter-spacing) - check if values allow user overrides
+- Interactive element states (focus indicators, hover states, disabled states)
+- Color-only indicators (should have icons or labels)
+- Non-text contrast (UI component borders and backgrounds)
+` : '\n=== DESKTOP CSS & RENDERED HTML ANALYSIS ===\nCSS analysis could not be extracted. Please analyze based on HTML structure only.\n'}
+
 ${websiteContent.mobileData ? `\n=== MOBILE VIEWPORT ANALYSIS ===
 The website has been analyzed in a mobile viewport (390x844px - iPhone 12 Pro size) to provide mobile-specific accessibility insights.
 
@@ -580,6 +958,14 @@ ${websiteContent.mobileData.textContent.substring(0, 30000)}
 
 MOBILE HTML STRUCTURE (sample):
 ${websiteContent.mobileData.html.substring(0, 5000)}
+
+${websiteContent.mobileData.cssAnalysis ? `\nMOBILE CSS ANALYSIS:
+Links Analyzed: ${websiteContent.mobileData.cssAnalysis.links.total}
+${websiteContent.mobileData.cssAnalysis.links.details.length > 0 ? `\nMobile Link Details:\n${websiteContent.mobileData.cssAnalysis.links.details.slice(0, 10).map(link => `  - "${link.text.substring(0, 40)}": ${link.hasUnderline ? 'Has underline' : 'No underline'}, ${link.isBold ? 'Bold' : 'Not bold'}, Font size: ${link.fontSize}`).join('\n')}` : ''}
+Mobile Spacing:
+- Line-height: ${websiteContent.mobileData.cssAnalysis.spacing.body.lineHeight}
+- Letter-spacing: ${websiteContent.mobileData.cssAnalysis.spacing.body.letterSpacing}
+` : ''}
 
 IMPORTANT MOBILE CONSIDERATIONS:
 - When analyzing mobile-specific items (touch targets, mobile vs desktop, etc.), use the mobile viewport data above
