@@ -1619,9 +1619,10 @@ app.post('/api/audit', async (req, res) => {
       
       // List of models to try in order
       const modelsToTry = [
-        'gemini-2.5-flash',     // Latest model
-        'gemini-2.0-flash',     // Previous version, best performance
-        'gemini-1.5-flash'      // Fallback option
+        'gemini-3-pro-preview', // Latest Pro model (preview)
+        'gemini-2.5-pro',       // Pro model
+        'gemini-2.5-flash',     // Latest Flash model
+        'gemini-2.0-flash'      // Previous version, best performance
       ];
       
       // If specific model requested, try that first
