@@ -1544,7 +1544,7 @@ app.post('/api/audit', async (req, res) => {
       });
     }
 
-    const { url, auditOptions, model = 'gemini-2.0-flash' } = req.body;
+    const { url, auditOptions, model = 'gemini-2.5-flash' } = req.body;
 
     // Validate input
     if (!url) {
@@ -1612,8 +1612,8 @@ app.post('/api/audit', async (req, res) => {
       }
 
       // Try different model names - some may require billing
-      // Start with gemini-2.0-flash (best performance), then try others
-      let modelName = model || 'gemini-2.0-flash';
+      // Start with gemini-2.5-flash (latest flash model), then try others
+      let modelName = model || 'gemini-2.5-flash';
       let result;
       let lastError;
       
@@ -1737,7 +1737,7 @@ app.post('/api/audit', async (req, res) => {
 
     } else {
       return res.status(400).json({ 
-        error: `Unsupported model: ${model}. Use 'gemini-2.0-flash' (recommended) or 'gemini-1.5-flash'` 
+        error: `Unsupported model: ${model}. Use 'gemini-2.5-flash' (recommended), 'gemini-2.5-pro', 'gemini-3-pro-preview', or 'gemini-2.0-flash'` 
       });
     }
 
