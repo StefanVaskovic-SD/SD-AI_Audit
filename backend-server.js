@@ -1640,10 +1640,10 @@ app.post('/api/audit', async (req, res) => {
           result = await geminiModel.generateContent({
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             generationConfig: {
-              temperature: 0.3, // Lower temperature for more consistent JSON
+              temperature: 0.2, // Very low temperature for highly consistent JSON responses
               topK: 40,
               topP: 0.95,
-              maxOutputTokens: 16000,
+              maxOutputTokens: 32000, // Increased to allow detailed analysis for all 43+ audit items
               responseMimeType: 'application/json', // Force JSON response format
             }
           });
