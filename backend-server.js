@@ -407,6 +407,11 @@ Analyze ONLY the following checked items and provide detailed findings, issues, 
       prompt += `\n## ${category.title.toUpperCase()}\n`;
       checkedItems.forEach(([itemKey, item]) => {
         prompt += `\n✓ ${item.label}\n`;
+        // Include custom prompt if provided - it has higher priority but should still consider the label context
+        if (item.prompt && item.prompt.trim()) {
+          prompt += `\n⚠️ CUSTOM INSTRUCTIONS (HIGHEST PRIORITY - override default behavior if needed, but keep "${item.label}" as the main assessment context):\n${item.prompt}\n`;
+          console.log(`[Custom prompt included for ${item.label}]: ${item.prompt.substring(0, 100)}...`);
+        }
       });
     }
   });
@@ -504,6 +509,20 @@ app.post('/api/audit', async (req, res) => {
     console.log(`[${new Date().toISOString()}] Audit request received`);
     console.log('URL:', url);
     console.log('Model:', model);
+    
+    // Debug: Check if custom prompts are included
+    let customPromptCount = 0;
+    Object.entries(auditOptions).forEach(([categoryKey, category]) => {
+      Object.entries(category.items).forEach(([itemKey, item]) => {
+        if (item.checked && item.prompt && item.prompt.trim()) {
+          customPromptCount++;
+          console.log(`[Custom prompt found] ${category.title} > ${item.label}: "${item.prompt.substring(0, 50)}..."`);
+        }
+      });
+    });
+    if (customPromptCount > 0) {
+      console.log(`[Total custom prompts: ${customPromptCount}]`);
+    }
 
     // Step 1: Fetch website content
     const websiteContent = await fetchWebsiteContent(url);
