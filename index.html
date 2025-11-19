@@ -11,7 +11,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
-<body>
+<body style="background-color: #080808; margin: 0; padding: 0;">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -681,20 +681,20 @@ IMPORTANT:
       };
 
       return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-4 md:p-8">
+        <div className="min-h-screen text-white p-4 md:p-8" style={{ backgroundColor: '#080808' }}>
           <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="text-center mb-12">
-              <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+              <h1 className="text-5xl md:text-6xl font-bold mb-4" style={{ color: '#ffffff' }}>
                 AI Website Audit Tool
               </h1>
-              <p className="text-gray-400 text-lg">
+              <p className="text-lg" style={{ color: '#ffffff' }}>
                 Comprehensive UX, Content, and Accessibility Analysis
               </p>
             </div>
 
             {/* URL Input Section */}
-            <div className="bg-gray-800 rounded-2xl p-6 md:p-8 mb-8 shadow-2xl border border-gray-700">
+            <div className="rounded-2xl p-6 md:p-8 mb-8 shadow-2xl border" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
               <div className="mb-4">
                 <label className="block text-sm font-medium mb-2 text-gray-300">
                   Website URL
@@ -704,7 +704,8 @@ IMPORTANT:
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="https://example.com"
-                  className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-white placeholder-gray-500"
+                  className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-white placeholder-gray-500"
+                  style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}
                   disabled={isAnalyzing}
                 />
               </div>
@@ -718,7 +719,8 @@ IMPORTANT:
                     value={selectedModel}
                     onChange={(e) => setSelectedModel(e.target.value)}
                     disabled={isAnalyzing}
-                    className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-white"
+                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-white"
+                    style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}
                   >
                     <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recommended)</option>
                     <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
@@ -733,7 +735,8 @@ IMPORTANT:
                     value={backendUrl}
                     onChange={(e) => setBackendUrl(e.target.value)}
                     placeholder="https://sd-ai-audit.onrender.com"
-                    className="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-white placeholder-gray-500"
+                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-white placeholder-gray-500"
+                  style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}
                     disabled={isAnalyzing}
                   />
                 </div>
@@ -779,7 +782,7 @@ IMPORTANT:
                   const allChecked = checkedCount === totalCount;
 
                   return (
-                    <div key={categoryKey} className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                    <div key={categoryKey} className="rounded-xl p-6 border" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
                       <div 
                         className="flex items-center gap-3 mb-4 cursor-pointer hover:bg-gray-700/50 p-2 rounded-lg transition-colors"
                         onClick={() => toggleCategory(categoryKey)}
@@ -848,9 +851,9 @@ IMPORTANT:
 
                 {/* Screenshot Display */}
                 {screenshot && (
-                  <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                  <div className="rounded-xl p-6 border" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
                     <h3 className="text-xl font-bold mb-4">Website Screenshot</h3>
-                    <div className="rounded-lg overflow-hidden border border-gray-600 shadow-lg">
+                    <div className="rounded-lg overflow-hidden border shadow-lg" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
                       <img 
                         src={screenshot} 
                         alt="Website screenshot" 
@@ -863,8 +866,8 @@ IMPORTANT:
                 )}
 
                 {auditReport.categories.map((category, catIndex) => (
-                  <div key={catIndex} className="bg-gray-800 rounded-xl p-6 md:p-8 border border-gray-700">
-                    <h3 className="text-2xl font-bold mb-6 pb-4 border-b border-gray-700">
+                        <div key={catIndex} className="rounded-xl p-6 md:p-8 border" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+                    <h3 className="text-2xl font-bold mb-6 pb-4 border-b" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
                       {category.title}
                     </h3>
 
@@ -978,6 +981,39 @@ IMPORTANT:
               </div>
             )}
           </div>
+          
+          {/* Footer */}
+          <footer className="text-center" style={{ paddingTop: '48px', paddingBottom: '48px' }}>
+            <p className="text-white text-sm mb-2">Made by</p>
+            <div className="flex justify-center items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="216" height="24" viewBox="0 0 216 24" fill="none">
+                <g clipPath="url(#clip0_6433_9612)">
+                  <path d="M19.6364 0.0429688L7.55204 5.82153L4.95802 7.06582L4.85257 7.10799L4.89475 7.00255L7.25679 1.56142H4.36751L0.00195312 11.6001L0.297208 12.2328L11.306 6.98146L14.8701 5.2732L14.9756 5.20993L14.9123 5.31538L8.98614 18.2644L8.94396 18.3488L8.90178 18.2644L6.22339 12.4015L3.81918 13.5403L8.60652 24.0008H9.4712L20.0371 0.928733L19.6364 0.0429688Z" fill="#F5F5F7"/>
+                  <path d="M208.156 3.16473H206.574V2.57422H210.413V3.16473H208.831V7.40374H208.156V3.16473ZM213.007 7.42483L211.678 3.20691V7.42483H211.003V2.59531H212.142L213.386 6.62343L214.63 2.59531H215.769V7.42483H215.094V3.20691L213.766 7.42483H213.007Z" fill="#F5F5F7"/>
+                  <path d="M24.444 7.57082C24.444 4.04885 28.1769 2.17188 31.5934 2.17188C35.3263 2.17188 38.321 3.83796 39.0592 7.86608H35.8535C35.3263 5.58839 33.2595 4.95571 31.5091 4.95571C30.0539 4.95571 27.8817 5.56731 27.8817 7.44428C27.8817 8.89947 29.1259 9.61651 30.6866 9.93286L32.9643 10.3547C36.2753 10.9663 39.502 12.2105 39.502 16.0489C39.502 19.8872 35.6637 21.8485 31.9309 21.8485C27.3755 21.8485 24.3597 19.3599 23.959 15.2053H27.2701C27.8817 17.7993 29.5477 19.149 32.1418 19.149C34.4194 19.149 36.191 18.1156 36.191 16.2387C36.191 14.2773 34.1242 13.6446 32.2472 13.3283L29.9695 12.9065C26.9326 12.3371 24.444 10.7764 24.444 7.57082Z" fill="#F5F5F7"/>
+                  <path d="M45.0693 3.73242V7.46529H47.8742V9.74297H45.0693V17.4196C45.0693 18.8748 45.3856 19.1911 46.7354 19.1911H47.8742V21.5743H45.5965C42.5807 21.5743 41.9691 20.7518 41.9691 17.8414V9.63752H39.9023V7.46529H41.9691V3.73242H45.0693Z" fill="#F5F5F7"/>
+                  <path d="M54.3913 21.8691C51.0802 21.8691 49.625 19.6968 49.625 16.2803V7.46484H52.7252V15.5422C52.7252 17.3981 53.0415 19.275 55.3192 19.275C57.7023 19.275 58.5248 17.4192 58.5248 14.9306V7.46484H61.625V21.5527H58.5248V19.5914C57.7023 21.0255 56.2682 21.8691 54.3913 21.8691Z" fill="#F5F5F7"/>
+                  <path d="M77.0837 2.48828V21.4479H73.9835V19.6763C73.161 21.0261 71.7059 21.8486 69.8289 21.8486C66.5178 21.8486 63.7129 18.9382 63.7129 14.4883C63.7129 10.0384 66.5178 7.128 69.8289 7.128C71.6848 7.128 73.14 7.9505 73.9835 9.30023V2.48828H77.0837ZM66.9396 14.5094C66.9396 17.5252 68.3948 19.3811 70.4616 19.3811C72.5284 19.3811 74.089 17.8204 74.089 14.5094C74.089 11.3037 72.5284 9.63767 70.4616 9.63767C68.3948 9.63767 66.9396 11.4936 66.9396 14.5094Z" fill="#F5F5F7"/>
+                  <path d="M83.1998 5.69393H80.0996V2.59375H83.1998V5.69393ZM83.1998 21.5533H80.0996V7.46546H83.1998V21.5533Z" fill="#F5F5F7"/>
+                  <path d="M92.2256 21.869C88.8091 21.869 85.2871 19.5913 85.2871 14.5087C85.2871 9.42612 88.8091 7.14844 92.2256 7.14844C95.6421 7.14844 99.1641 9.42612 99.1641 14.5087C99.1641 19.5913 95.6421 21.869 92.2256 21.869ZM95.9585 14.5087C95.9585 11.3031 94.1869 9.63701 92.2256 9.63701C90.2643 9.63701 88.4927 11.1976 88.4927 14.5087C88.4927 17.7143 90.2643 19.3804 92.2256 19.3804C94.1869 19.275 95.9585 17.7143 95.9585 14.5087Z" fill="#F5F5F7"/>
+                  <path d="M117.195 12.0208C117.195 19.4865 112.64 21.5533 106.629 21.5533H101.441V2.48828H106.629C112.64 2.48828 117.195 4.55506 117.195 12.0208ZM104.774 5.16666V18.8538H106.44C110.067 18.8538 113.8 18.0313 113.8 12.0208C113.8 6.01025 110.173 5.18775 106.44 5.18775L104.774 5.16666Z" fill="#F5F5F7"/>
+                  <path d="M122.701 5.69393H119.58V2.59375H122.68V5.69393H122.701ZM122.701 21.5533H119.58V7.46546H122.68V21.5533H122.701Z" fill="#F5F5F7"/>
+                  <path d="M131.917 10.4596C129.955 10.4596 128.817 11.282 128.817 14.087V21.4472H125.695V7.46482H128.795V9.9534C129.513 8.39277 130.862 7.46482 132.634 7.35938C132.845 7.35938 133.245 7.35938 133.456 7.46482V10.565C132.845 10.565 132.339 10.4596 131.917 10.4596Z" fill="#F5F5F7"/>
+                  <path d="M140.522 19.275C142.188 19.275 143.432 18.6634 143.939 17.3136H147.039C146.427 19.5913 144.234 21.869 140.606 21.869C136.051 21.869 133.457 18.4525 133.457 14.4033C133.457 10.1643 136.367 7.14844 140.396 7.14844C144.74 7.14844 147.439 10.6704 147.123 15.4367H136.663C136.895 18.0307 138.772 19.275 140.522 19.275ZM144.044 13.0535C143.939 10.8813 142.272 9.53157 140.417 9.53157C138.961 9.53157 136.895 10.3541 136.684 13.0535H144.044Z" fill="#F5F5F7"/>
+                  <path d="M158.658 12.231C158.341 10.7758 157.097 9.63699 155.347 9.63699C153.385 9.63699 151.614 11.0922 151.614 14.4032C151.614 17.7143 153.385 19.1695 155.241 19.1695C156.802 19.1695 158.341 18.4525 158.658 16.5755H161.674C161.062 19.8866 158.152 21.7635 155.136 21.7635C151.087 21.7635 148.303 18.5579 148.303 14.4032C148.303 10.2486 151.002 7.04297 155.241 7.04297C158.341 7.04297 161.041 9.0043 161.568 12.231H158.658Z" fill="#F5F5F7"/>
+                  <path d="M167.263 3.73242V7.46529H170.068V9.74297H167.263V17.4196C167.263 18.8748 167.579 19.1911 168.929 19.1911H170.068V21.5743H167.79C164.774 21.5743 164.162 20.7518 164.162 17.8414V9.63752H162.096V7.46529H164.162V3.73242H167.263Z" fill="#F5F5F7"/>
+                  <path d="M175.235 5.69393H172.135V2.59375H175.235V5.69393ZM175.235 21.5533H172.135V7.46546H175.235V21.5533Z" fill="#F5F5F7"/>
+                  <path d="M184.155 21.869C180.739 21.869 177.217 19.5913 177.217 14.5087C177.217 9.42612 180.739 7.14844 184.155 7.14844C187.572 7.14844 191.094 9.42612 191.094 14.5087C191.199 19.5913 187.677 21.869 184.155 21.869ZM187.888 14.5087C187.888 11.3031 186.117 9.63701 184.155 9.63701C182.194 9.63701 180.422 11.1976 180.422 14.5087C180.422 17.7143 182.194 19.3804 184.155 19.3804C186.138 19.275 187.888 17.7143 187.888 14.5087Z" fill="#F5F5F7"/>
+                  <path d="M200.647 7.14844C204.064 7.14844 205.414 9.32067 205.414 12.7372V21.5527H202.313V13.4753C202.313 11.6194 201.997 9.74246 199.614 9.74246C197.231 9.74246 196.303 11.5984 196.303 14.0869V21.5527H193.182V7.46478H196.282V9.42612C197.104 7.86548 198.665 7.14844 200.647 7.14844Z" fill="#F5F5F7"/>
+                </g>
+                <defs>
+                  <clipPath id="clip0_6433_9612">
+                    <rect width="216" height="24" fill="white"/>
+                  </clipPath>
+                </defs>
+              </svg>
+            </div>
+          </footer>
         </div>
       );
     };
