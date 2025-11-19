@@ -140,8 +140,7 @@ async function fetchWebsiteSimple(url) {
       url,
       html: html.substring(0, 200000),
       structuredData,
-      screenshot: null, // Simple fetch can't take screenshots
-      elementScreenshots: null,
+      mobileData: null, // Simple fetch can't capture mobile viewport
       fetchedAt: new Date().toISOString()
     };
   } catch (error) {
@@ -225,73 +224,11 @@ async function fetchWebsiteContent(url) {
       // Wait again after scrolling
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Get content
+      // Get desktop content
       const html = await page.content();
       const title = await page.title();
       
-      // Take full page screenshot
-      let screenshot = null;
-      try {
-        screenshot = await page.screenshot({
-          type: 'png',
-          fullPage: true, // Full page screenshot
-          encoding: 'base64'
-        });
-        console.log(`[${new Date().toISOString()}] Screenshot captured successfully`);
-      } catch (screenshotError) {
-        console.warn('Screenshot failed:', screenshotError.message);
-        // Try viewport screenshot as fallback
-        try {
-          screenshot = await page.screenshot({
-            type: 'png',
-            fullPage: false,
-            encoding: 'base64'
-          });
-          console.log(`[${new Date().toISOString()}] Viewport screenshot captured`);
-        } catch (screenshotError2) {
-          console.warn('Viewport screenshot also failed:', screenshotError2.message);
-        }
-      }
-      
-      // Take screenshots of specific elements that might be relevant
-      const elementScreenshots = {};
-      try {
-        // Try to capture common problematic elements
-        const selectors = [
-          'form',
-          'button',
-          'input[type="submit"]',
-          '.cta',
-          '[class*="button"]',
-          '[class*="form"]',
-          'nav',
-          'header'
-        ];
-        
-        for (const selector of selectors) {
-          try {
-            const elements = await page.$$(selector);
-            if (elements.length > 0) {
-              // Take screenshot of first element
-              const elementScreenshot = await elements[0].screenshot({
-                type: 'png',
-                encoding: 'base64'
-              });
-              elementScreenshots[selector] = `data:image/png;base64,${elementScreenshot}`;
-            }
-          } catch (e) {
-            // Ignore individual element screenshot failures
-          }
-        }
-      } catch (e) {
-        console.warn('Element screenshots failed:', e.message);
-      }
-      
-      // Close browser immediately
-      await browser.close();
-      browser = null;
-      
-      // Parse with Cheerio
+      // Parse desktop content with Cheerio
       const $ = cheerio.load(html);
       const structuredData = {
         title: title || $('title').text() || 'No title',
@@ -322,14 +259,232 @@ async function fetchWebsiteContent(url) {
         textContent: $('body').text().replace(/\s+/g, ' ').trim().substring(0, 50000)
       };
       
+      console.log(`[${new Date().toISOString()}] Desktop content fetched successfully`);
+      
+      // Now capture mobile viewport data
+      console.log(`[${new Date().toISOString()}] Capturing mobile viewport data...`);
+      let mobileData = null;
+      try {
+        // Set mobile viewport (iPhone 12 Pro dimensions - common mobile size)
+        await page.setViewport({ 
+          width: 390, 
+          height: 844,
+          deviceScaleFactor: 3, // Retina display
+          isMobile: true,
+          hasTouch: true
+        });
+        
+        // Set mobile user agent
+        await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1');
+        
+        // Reload page with mobile viewport to ensure proper rendering
+        await page.reload({ waitUntil: 'networkidle0', timeout: 30000 }).catch(() => {
+          return page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
+        }).catch(() => {
+          console.warn('Mobile page reload failed, continuing with current state');
+        });
+        
+        // Wait for mobile layout to stabilize
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Scroll to trigger lazy loading on mobile
+        await page.evaluate(async () => {
+          await new Promise((resolve) => {
+            let totalHeight = 0;
+            const distance = 100;
+            const timer = setInterval(() => {
+              const scrollHeight = document.body.scrollHeight;
+              window.scrollBy(0, distance);
+              totalHeight += distance;
+              
+              if(totalHeight >= scrollHeight){
+                clearInterval(timer);
+                window.scrollTo(0, 0); // Scroll back to top
+                resolve();
+              }
+            }, 100);
+          });
+        });
+        
+        // Wait again after scrolling
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Get mobile HTML and extract mobile-specific data
+        const mobileHtml = await page.content();
+        const $mobile = cheerio.load(mobileHtml);
+        
+        // Extract mobile-specific accessibility data
+        mobileData = await page.evaluate(() => {
+          const getElementSize = (el) => {
+            const rect = el.getBoundingClientRect();
+            return {
+              width: Math.round(rect.width),
+              height: Math.round(rect.height),
+              x: Math.round(rect.x),
+              y: Math.round(rect.y)
+            };
+          };
+          
+          const getComputedStyle = (el, prop) => {
+            return window.getComputedStyle(el).getPropertyValue(prop);
+          };
+          
+          // Check viewport meta tag
+          const viewportMeta = document.querySelector('meta[name="viewport"]');
+          const viewportContent = viewportMeta ? viewportMeta.getAttribute('content') : null;
+          
+          // Analyze touch targets (buttons, links, inputs)
+          const interactiveElements = [];
+          const selectors = ['button', 'a', 'input', 'select', 'textarea', '[role="button"]', '[tabindex]'];
+          
+          selectors.forEach(selector => {
+            document.querySelectorAll(selector).forEach((el, index) => {
+              if (index < 20) { // Limit to first 20 of each type
+                const size = getElementSize(el);
+                const fontSize = parseInt(getComputedStyle(el, 'font-size')) || 16;
+                const paddingTop = parseInt(getComputedStyle(el, 'padding-top')) || 0;
+                const paddingBottom = parseInt(getComputedStyle(el, 'padding-bottom')) || 0;
+                const paddingLeft = parseInt(getComputedStyle(el, 'padding-left')) || 0;
+                const paddingRight = parseInt(getComputedStyle(el, 'padding-right')) || 0;
+                
+                // Calculate effective touch target (including padding)
+                const effectiveWidth = size.width + paddingLeft + paddingRight;
+                const effectiveHeight = size.height + paddingTop + paddingBottom;
+                
+                interactiveElements.push({
+                  tag: el.tagName.toLowerCase(),
+                  text: el.textContent.trim().substring(0, 50),
+                  size: size,
+                  effectiveSize: {
+                    width: effectiveWidth,
+                    height: effectiveHeight
+                  },
+                  fontSize: fontSize,
+                  meetsWCAG: effectiveWidth >= 44 && effectiveHeight >= 44,
+                  hasLabel: el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent.trim().length > 0
+                });
+              }
+            });
+          });
+          
+          // Check spacing between interactive elements
+          const spacingIssues = [];
+          interactiveElements.forEach((el1, i) => {
+            interactiveElements.slice(i + 1).forEach(el2 => {
+              const distanceX = Math.abs(el1.size.x - el2.size.x);
+              const distanceY = Math.abs(el1.size.y - el2.size.y);
+              const minDistance = 8; // WCAG recommends at least 8px spacing
+              
+              if (distanceX < minDistance && distanceY < minDistance) {
+                spacingIssues.push({
+                  element1: el1.text.substring(0, 30),
+                  element2: el2.text.substring(0, 30),
+                  distance: Math.min(distanceX, distanceY)
+                });
+              }
+            });
+          });
+          
+          // Check for mobile-specific CSS (media queries)
+          const stylesheets = Array.from(document.styleSheets);
+          let hasMobileMediaQueries = false;
+          let mobileBreakpoints = [];
+          
+          stylesheets.forEach(sheet => {
+            try {
+              const rules = sheet.cssRules || [];
+              rules.forEach(rule => {
+                if (rule.type === CSSRule.MEDIA_RULE) {
+                  const mediaText = rule.media.mediaText;
+                  if (mediaText.includes('max-width') || mediaText.includes('min-width')) {
+                    hasMobileMediaQueries = true;
+                    mobileBreakpoints.push(mediaText);
+                  }
+                }
+              });
+            } catch (e) {
+              // Cross-origin stylesheets may throw errors
+            }
+          });
+          
+          // Check text size and readability
+          const bodyText = document.body;
+          const bodyFontSize = parseInt(getComputedStyle(bodyText, 'font-size')) || 16;
+          const bodyLineHeight = parseFloat(getComputedStyle(bodyText, 'line-height')) || 1.5;
+          
+          return {
+            viewport: {
+              width: window.innerWidth,
+              height: window.innerHeight,
+              metaTag: viewportContent,
+              hasViewportMeta: !!viewportMeta
+            },
+            touchTargets: {
+              total: interactiveElements.length,
+              compliant: interactiveElements.filter(el => el.meetsWCAG).length,
+              nonCompliant: interactiveElements.filter(el => !el.meetsWCAG).map(el => ({
+                element: el.text.substring(0, 50),
+                size: `${el.effectiveSize.width}x${el.effectiveSize.height}px`,
+                required: '44x44px minimum'
+              })),
+              details: interactiveElements.slice(0, 30) // Limit details
+            },
+            spacing: {
+              issues: spacingIssues.slice(0, 10) // Limit issues
+            },
+            responsive: {
+              hasMobileMediaQueries: hasMobileMediaQueries,
+              breakpoints: mobileBreakpoints.slice(0, 5)
+            },
+            typography: {
+              bodyFontSize: bodyFontSize,
+              bodyLineHeight: bodyLineHeight,
+              meetsMinimum: bodyFontSize >= 16
+            },
+            textContent: document.body.innerText.replace(/\s+/g, ' ').trim().substring(0, 30000)
+          };
+        });
+        
+        // Parse mobile HTML structure
+        const mobileStructuredData = {
+          headings: {
+            h1: $mobile('h1').map((i, el) => $mobile(el).text()).get(),
+            h2: $mobile('h2').map((i, el) => $mobile(el).text()).get(),
+            h3: $mobile('h3').map((i, el) => $mobile(el).text()).get(),
+          },
+          buttons: $mobile('button, input[type="submit"], input[type="button"]').map((i, el) => ({
+            text: $mobile(el).text() || $mobile(el).attr('value') || '',
+            type: $mobile(el).attr('type') || 'button'
+          })).get(),
+          links: $mobile('a').map((i, el) => ({
+            text: $mobile(el).text().trim(),
+            href: $mobile(el).attr('href')
+          })).get().slice(0, 30),
+          forms: $mobile('form').length
+        };
+        
+        mobileData.structuredData = mobileStructuredData;
+        mobileData.html = mobileHtml.substring(0, 100000); // Smaller sample for mobile
+        
+        console.log(`[${new Date().toISOString()}] Mobile viewport data captured successfully`);
+        console.log(`[Mobile] Touch targets: ${mobileData.touchTargets.compliant}/${mobileData.touchTargets.total} compliant`);
+        
+      } catch (mobileError) {
+        console.warn(`[${new Date().toISOString()}] Mobile viewport capture failed: ${mobileError.message}`);
+        mobileData = null;
+      }
+      
+      // Close browser
+      await browser.close();
+      browser = null;
+      
       console.log(`[${new Date().toISOString()}] Website fetched successfully with Puppeteer`);
       
       return {
         url,
         html: html.substring(0, 200000),
         structuredData,
-        screenshot: screenshot ? `data:image/png;base64,${screenshot}` : null,
-        elementScreenshots: Object.keys(elementScreenshots).length > 0 ? elementScreenshots : null,
+        mobileData: mobileData,
         fetchedAt: new Date().toISOString()
       };
       
@@ -385,6 +540,55 @@ BUTTONS: ${websiteContent.structuredData.buttons.length}
 HTML STRUCTURE (sample):
 ${websiteContent.html.substring(0, 10000)}
 
+${websiteContent.mobileData ? `\n=== MOBILE VIEWPORT ANALYSIS ===
+The website has been analyzed in a mobile viewport (390x844px - iPhone 12 Pro size) to provide mobile-specific accessibility insights.
+
+MOBILE VIEWPORT SETTINGS:
+- Viewport Width: ${websiteContent.mobileData.viewport.width}px
+- Viewport Height: ${websiteContent.mobileData.viewport.height}px
+- Viewport Meta Tag: ${websiteContent.mobileData.viewport.metaTag || 'Not found'}
+- Has Viewport Meta: ${websiteContent.mobileData.viewport.hasViewportMeta ? 'Yes' : 'No'}
+
+MOBILE TOUCH TARGET ANALYSIS (WCAG 2.2 AA requires minimum 44x44px):
+- Total Interactive Elements Analyzed: ${websiteContent.mobileData.touchTargets.total}
+- WCAG Compliant (≥44x44px): ${websiteContent.mobileData.touchTargets.compliant}
+- Non-Compliant: ${websiteContent.mobileData.touchTargets.nonCompliant.length}
+${websiteContent.mobileData.touchTargets.nonCompliant.length > 0 ? `\nNon-Compliant Touch Targets:\n${websiteContent.mobileData.touchTargets.nonCompliant.map(t => `  - "${t.element}": ${t.size} (required: ${t.required})`).join('\n')}` : ''}
+
+MOBILE SPACING ANALYSIS:
+- Elements with Insufficient Spacing (<8px): ${websiteContent.mobileData.spacing.issues.length}
+${websiteContent.mobileData.spacing.issues.length > 0 ? `\nSpacing Issues:\n${websiteContent.mobileData.spacing.issues.map(s => `  - "${s.element1}" and "${s.element2}": ${s.distance}px apart`).join('\n')}` : ''}
+
+MOBILE RESPONSIVE DESIGN:
+- Has Mobile Media Queries: ${websiteContent.mobileData.responsive.hasMobileMediaQueries ? 'Yes' : 'No'}
+${websiteContent.mobileData.responsive.breakpoints.length > 0 ? `- Breakpoints Found:\n${websiteContent.mobileData.responsive.breakpoints.map(b => `  - ${b}`).join('\n')}` : ''}
+
+MOBILE TYPOGRAPHY:
+- Body Font Size: ${websiteContent.mobileData.typography.bodyFontSize}px
+- Body Line Height: ${websiteContent.mobileData.typography.bodyLineHeight}
+- Meets Minimum (16px): ${websiteContent.mobileData.typography.meetsMinimum ? 'Yes' : 'No'}
+
+MOBILE CONTENT STRUCTURE:
+- H1 Headings: ${websiteContent.mobileData.structuredData.headings.h1.join(', ') || 'None'}
+- H2 Headings: ${websiteContent.mobileData.structuredData.headings.h2.slice(0, 10).join(', ') || 'None'}
+- Buttons Found: ${websiteContent.mobileData.structuredData.buttons.length}
+- Links Found: ${websiteContent.mobileData.structuredData.links.length}
+- Forms Found: ${websiteContent.mobileData.structuredData.forms}
+
+MOBILE TEXT CONTENT (first 30,000 characters):
+${websiteContent.mobileData.textContent.substring(0, 30000)}
+
+MOBILE HTML STRUCTURE (sample):
+${websiteContent.mobileData.html.substring(0, 5000)}
+
+IMPORTANT MOBILE CONSIDERATIONS:
+- When analyzing mobile-specific items (touch targets, mobile vs desktop, etc.), use the mobile viewport data above
+- Compare desktop and mobile experiences where relevant
+- Touch target sizes are measured including padding (effective touch area)
+- Mobile spacing issues can cause accidental taps
+- Viewport meta tag is critical for proper mobile rendering
+` : '\n=== MOBILE VIEWPORT ANALYSIS ===\nMobile viewport data could not be captured. Please analyze based on desktop content only.\n'}
+
 AUDIT INSTRUCTIONS:
 THOROUGHLY examine ALL the provided content. Important considerations:
 - Many modern websites use lazy-loading, JavaScript rendering, and dynamic content
@@ -429,8 +633,7 @@ FORMAT YOUR RESPONSE AS THIS EXACT JSON STRUCTURE:
           "status": "good",
           "findings": "Detailed description",
           "issues": ["Issue 1", "Issue 2"],
-          "recommendations": ["Recommendation 1", "Recommendation 2"],
-          "screenshotRequest": "optional - describe what element/area would benefit from a screenshot"
+          "recommendations": ["Recommendation 1", "Recommendation 2"]
         }
       ]
     }
@@ -448,12 +651,6 @@ STRICT JSON RULES:
 8. Do NOT include any text before or after the JSON
 9. Ensure all commas are present between array/object elements
 10. If content is very long, truncate it rather than breaking JSON structure
-
-SCREENSHOT RECOMMENDATIONS:
-- If you identify a specific issue that would benefit from a visual screenshot, you can add a "screenshotRequest" field to that item
-- Format: "screenshotRequest": "description of what element/area to screenshot" (e.g., "form with validation issues", "navigation menu", "CTA button")
-- Only request screenshots when they would help illustrate the issue or recommendation
-- Available element screenshots are listed above - reference them if relevant
 
 IMPORTANT: 
 - Be specific and actionable in your recommendations
@@ -672,14 +869,7 @@ app.post('/api/audit', async (req, res) => {
 
     console.log(`[${new Date().toISOString()}] Audit completed successfully`);
 
-    // Add screenshots to response if available
-    const responseWithScreenshots = {
-      ...response,
-      screenshot: websiteContent.screenshot || null,
-      elementScreenshots: websiteContent.elementScreenshots || null
-    };
-
-    res.json(responseWithScreenshots);
+    res.json(response);
 
   } catch (error) {
     console.error('Error in audit endpoint:', error);

@@ -64,8 +64,6 @@
       const [url, setUrl] = useState('');
       const [isAnalyzing, setIsAnalyzing] = useState(false);
       const [auditReport, setAuditReport] = useState(null);
-      const [screenshot, setScreenshot] = useState(null);
-      const [elementScreenshots, setElementScreenshots] = useState(null);
       const [error, setError] = useState('');
       const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
       const [backendUrl, setBackendUrl] = useState('https://sd-ai-audit.onrender.com');
@@ -434,8 +432,6 @@ IMPORTANT:
         setIsAnalyzing(true);
         setError('');
         setAuditReport(null);
-        setScreenshot(null);
-        setElementScreenshots(null);
 
         try {
           console.log('Starting comprehensive audit...');
@@ -495,19 +491,6 @@ IMPORTANT:
           }
           
           console.log('Parsed audit report:', auditJson);
-          
-          // Save screenshots if available
-          if (auditData.screenshot) {
-            setScreenshot(auditData.screenshot);
-          } else {
-            setScreenshot(null);
-          }
-          
-          if (auditData.elementScreenshots) {
-            setElementScreenshots(auditData.elementScreenshots);
-          } else {
-            setElementScreenshots(null);
-          }
           
           // Validate the structure
           if (!auditJson.categories || !Array.isArray(auditJson.categories)) {
@@ -594,19 +577,6 @@ IMPORTANT:
             </div>
           `;
 
-          // Add screenshot to PDF if available
-          if (screenshot) {
-            htmlContent += `
-              <div style="margin-bottom: 30px; page-break-inside: avoid;">
-                <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 15px; color: #1f2937;">Website Screenshot</h2>
-                <div style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; max-width: 100%;">
-                  <img src="${screenshot}" alt="Website screenshot" style="width: 100%; height: auto; max-height: 400px; object-fit: contain; display: block;" />
-                </div>
-                <p style="color: #6b7280; font-size: 12px; margin-top: 8px;">Screenshot captured during audit</p>
-              </div>
-            `;
-          }
-
           auditReport.categories.forEach((category, catIndex) => {
             htmlContent += `
               <div style="margin-bottom: 40px; page-break-inside: avoid;">
@@ -666,38 +636,6 @@ IMPORTANT:
                     </ul>
                   </div>
                 `;
-              }
-
-              // Add screenshot to PDF if AI requested one
-              if (item.screenshotRequest && elementScreenshots) {
-                const requestLower = item.screenshotRequest.toLowerCase();
-                let matchingScreenshot = null;
-                
-                if (requestLower.includes('form')) {
-                  matchingScreenshot = elementScreenshots['form'] || elementScreenshots['[class*="form"]'];
-                } else if (requestLower.includes('button') || requestLower.includes('cta')) {
-                  matchingScreenshot = elementScreenshots['button'] || elementScreenshots['[class*="button"]'] || elementScreenshots['.cta'];
-                } else if (requestLower.includes('nav') || requestLower.includes('menu')) {
-                  matchingScreenshot = elementScreenshots['nav'];
-                } else if (requestLower.includes('header')) {
-                  matchingScreenshot = elementScreenshots['header'];
-                }
-                
-                if (!matchingScreenshot && Object.keys(elementScreenshots).length > 0) {
-                  matchingScreenshot = Object.values(elementScreenshots)[0];
-                }
-                
-                if (matchingScreenshot) {
-                  htmlContent += `
-                    <div style="margin-bottom: 15px; margin-top: 15px;">
-                      <p style="font-weight: 600; color: #9333ea; margin-bottom: 8px; font-size: 13px;">Relevant Screenshot:</p>
-                      <p style="color: #6b7280; font-size: 11px; font-style: italic; margin-bottom: 8px;">${item.screenshotRequest}</p>
-                      <div style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; max-width: 400px;">
-                        <img src="${matchingScreenshot}" alt="${item.screenshotRequest}" style="width: 100%; height: auto; max-height: 250px; object-fit: contain; display: block;" />
-                      </div>
-                    </div>
-                  `;
-                }
               }
 
               htmlContent += `</div>`;
@@ -921,8 +859,6 @@ IMPORTANT:
                     <button
                       onClick={() => {
                         setAuditReport(null);
-                        setScreenshot(null);
-                        setElementScreenshots(null);
                         setUrl('');
                       }}
                       className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
@@ -931,22 +867,6 @@ IMPORTANT:
                     </button>
                   </div>
                 </div>
-
-                {/* Screenshot Display */}
-                {screenshot && (
-                  <div className="rounded-xl p-6 border" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-                    <h3 className="text-xl font-bold mb-4">Website Screenshot</h3>
-                    <div className="rounded-lg overflow-hidden border shadow-lg" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-                      <img 
-                        src={screenshot} 
-                        alt="Website screenshot" 
-                        className="w-full h-auto"
-                        style={{ maxHeight: '600px', objectFit: 'contain' }}
-                      />
-                    </div>
-                    <p className="text-sm text-gray-400 mt-2">Screenshot captured during audit</p>
-                  </div>
-                )}
 
                 {auditReport.categories.map((category, catIndex) => (
                         <div key={catIndex} className="rounded-xl p-6 md:p-8 border" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
@@ -1009,51 +929,6 @@ IMPORTANT:
                               </div>
                             )}
 
-                            {/* Show relevant screenshot if AI requested one */}
-                            {item.screenshotRequest && elementScreenshots && (
-                              <div className="mt-4">
-                                <p className="text-sm font-semibold text-purple-400 mb-2">Relevant Screenshot:</p>
-                                <p className="text-xs text-gray-400 mb-2 italic">{item.screenshotRequest}</p>
-                                {(() => {
-                                  // Try to find matching screenshot based on request
-                                  const requestLower = item.screenshotRequest.toLowerCase();
-                                  let matchingScreenshot = null;
-                                  
-                                  // Check for form-related
-                                  if (requestLower.includes('form')) {
-                                    matchingScreenshot = elementScreenshots['form'] || elementScreenshots['[class*="form"]'];
-                                  }
-                                  // Check for button-related
-                                  else if (requestLower.includes('button') || requestLower.includes('cta')) {
-                                    matchingScreenshot = elementScreenshots['button'] || elementScreenshots['[class*="button"]'] || elementScreenshots['.cta'];
-                                  }
-                                  // Check for navigation
-                                  else if (requestLower.includes('nav') || requestLower.includes('menu')) {
-                                    matchingScreenshot = elementScreenshots['nav'];
-                                  }
-                                  // Check for header
-                                  else if (requestLower.includes('header')) {
-                                    matchingScreenshot = elementScreenshots['header'];
-                                  }
-                                  
-                                  // If no match, show first available
-                                  if (!matchingScreenshot && Object.keys(elementScreenshots).length > 0) {
-                                    matchingScreenshot = Object.values(elementScreenshots)[0];
-                                  }
-                                  
-                                  return matchingScreenshot ? (
-                                    <div className="rounded-lg overflow-hidden border shadow-lg max-w-md" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-                                      <img 
-                                        src={matchingScreenshot} 
-                                        alt={item.screenshotRequest}
-                                        className="w-full h-auto"
-                                        style={{ maxHeight: '300px', objectFit: 'contain' }}
-                                      />
-                                    </div>
-                                  ) : null;
-                                })()}
-                              </div>
-                            )}
                           </div>
                         </div>
                         );
