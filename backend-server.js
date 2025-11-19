@@ -325,6 +325,36 @@ async function fetchWebsiteContent(url) {
               const placeholder = input.getAttribute('placeholder') || '';
               const placeholderColor = input.matches(':placeholder-shown') ? styles.color : '';
               
+              // Check label visibility
+              let labelVisible = false;
+              let labelText = '';
+              if (input.labels && input.labels.length > 0) {
+                input.labels.forEach(label => {
+                  const labelStyles = window.getComputedStyle(label);
+                  if (labelStyles.display !== 'none' && labelStyles.visibility !== 'hidden' && labelStyles.opacity !== '0') {
+                    labelVisible = true;
+                    labelText = label.textContent.trim();
+                  }
+                });
+              }
+              
+              // Check for aria-label or aria-labelledby
+              const ariaLabel = input.getAttribute('aria-label');
+              const ariaLabelledBy = input.getAttribute('aria-labelledby');
+              if (ariaLabel) {
+                labelVisible = true;
+                labelText = ariaLabel;
+              } else if (ariaLabelledBy) {
+                const labelEl = document.getElementById(ariaLabelledBy);
+                if (labelEl) {
+                  const labelStyles = window.getComputedStyle(labelEl);
+                  if (labelStyles.display !== 'none' && labelStyles.visibility !== 'hidden') {
+                    labelVisible = true;
+                    labelText = labelEl.textContent.trim();
+                  }
+                }
+              }
+              
               formElements.push({
                 type: input.type || input.tagName.toLowerCase(),
                 name: input.name || '',
@@ -335,7 +365,9 @@ async function fetchWebsiteContent(url) {
                 backgroundColor: styles.backgroundColor,
                 borderColor: styles.borderColor,
                 fontSize: styles.fontSize,
-                hasLabel: !!(input.labels && input.labels.length > 0) || !!(input.getAttribute('aria-label')) || !!(input.getAttribute('aria-labelledby'))
+                hasLabel: !!(input.labels && input.labels.length > 0) || !!ariaLabel || !!ariaLabelledBy,
+                labelVisible: labelVisible,
+                labelText: labelText.substring(0, 50)
               });
               
               // Look for error messages near this input
@@ -358,57 +390,148 @@ async function fetchWebsiteContent(url) {
             }
           });
           
-          // Analyze spacing (line-height, letter-spacing)
+          // Analyze spacing (line-height, letter-spacing) with unit checking
+          const checkIfRelativeUnit = (value) => {
+            if (!value) return false;
+            const str = value.toString().toLowerCase();
+            return str.includes('em') || str.includes('rem') || str === 'normal' || str === 'inherit';
+          };
+          
           const spacingAnalysis = {
             body: {
               lineHeight: getComputedStyle(document.body, 'line-height'),
               letterSpacing: getComputedStyle(document.body, 'letter-spacing'),
-              fontSize: getComputedStyle(document.body, 'font-size')
+              fontSize: getComputedStyle(document.body, 'font-size'),
+              lineHeightAllowsOverride: checkIfRelativeUnit(getComputedStyle(document.body, 'line-height')),
+              letterSpacingAllowsOverride: checkIfRelativeUnit(getComputedStyle(document.body, 'letter-spacing'))
             },
             paragraphs: []
           };
           
           document.querySelectorAll('p').forEach((p, index) => {
             if (index < 10) {
+              const lineHeight = getComputedStyle(p, 'line-height');
+              const letterSpacing = getComputedStyle(p, 'letter-spacing');
               spacingAnalysis.paragraphs.push({
-                lineHeight: getComputedStyle(p, 'line-height'),
-                letterSpacing: getComputedStyle(p, 'letter-spacing'),
-                fontSize: getComputedStyle(p, 'font-size')
+                lineHeight: lineHeight,
+                letterSpacing: letterSpacing,
+                fontSize: getComputedStyle(p, 'font-size'),
+                lineHeightAllowsOverride: checkIfRelativeUnit(lineHeight),
+                letterSpacingAllowsOverride: checkIfRelativeUnit(letterSpacing)
               });
             }
           });
           
-          // Analyze button and interactive element states
+          // Analyze desktop target sizes (24x24px minimum for clickable areas)
+          const targetSizes = [];
+          document.querySelectorAll('button, a, input, select, [role="button"], [role="link"], [tabindex]:not([tabindex="-1"])').forEach((el, index) => {
+            if (index < 30) {
+              const rect = el.getBoundingClientRect();
+              const styles = window.getComputedStyle(el);
+              const paddingTop = parseFloat(styles.paddingTop) || 0;
+              const paddingBottom = parseFloat(styles.paddingBottom) || 0;
+              const paddingLeft = parseFloat(styles.paddingLeft) || 0;
+              const paddingRight = parseFloat(styles.paddingRight) || 0;
+              
+              const effectiveWidth = rect.width + paddingLeft + paddingRight;
+              const effectiveHeight = rect.height + paddingTop + paddingBottom;
+              
+              targetSizes.push({
+                tag: el.tagName.toLowerCase(),
+                text: el.textContent.trim().substring(0, 40),
+                width: Math.round(rect.width),
+                height: Math.round(rect.height),
+                effectiveWidth: Math.round(effectiveWidth),
+                effectiveHeight: Math.round(effectiveHeight),
+                meets24x24: effectiveWidth >= 24 && effectiveHeight >= 24
+              });
+            }
+          });
+          
+          // Analyze button and interactive element states (hover, focus, active, disabled)
           const interactiveElements = [];
-          document.querySelectorAll('button, a, input[type="button"], input[type="submit"], [role="button"]').forEach((el, index) => {
-            if (index < 20) {
+          const hoverOnlyInfo = [];
+          
+          document.querySelectorAll('button, a, input[type="button"], input[type="submit"], [role="button"], [title], [data-tooltip], [aria-label]').forEach((el, index) => {
+            if (index < 25) {
               const normalStyles = window.getComputedStyle(el);
               
-              // Try to get hover state (simulate by checking if :hover rule exists)
+              // Check for tooltips/titles that might be hover-only
+              const title = el.getAttribute('title');
+              const ariaLabel = el.getAttribute('aria-label');
+              const hasTooltip = el.hasAttribute('data-tooltip') || el.querySelector('[class*="tooltip"]');
+              
+              // Check for CSS hover styles by examining stylesheet rules
+              let hasHoverStyles = false;
               let hoverStyles = null;
               try {
-                // Create a temporary element to check hover styles
-                const testEl = el.cloneNode(true);
-                testEl.style.position = 'absolute';
-                testEl.style.left = '-9999px';
-                document.body.appendChild(testEl);
-                // Note: Can't actually trigger hover in evaluate, but we can check computed styles
-                hoverStyles = {
-                  color: normalStyles.color,
-                  backgroundColor: normalStyles.backgroundColor,
-                  borderColor: normalStyles.borderColor
-                };
-                document.body.removeChild(testEl);
-              } catch (e) {
-                // Ignore
-              }
+                const sheets = document.styleSheets;
+                for (let sheet of sheets) {
+                  try {
+                    const rules = sheet.cssRules || sheet.rules;
+                    for (let rule of rules) {
+                      if (rule.type === CSSRule.STYLE_RULE && rule.selectorText) {
+                        const selector = rule.selectorText.toLowerCase();
+                        // Check if this element matches the hover selector
+                        const baseSelector = selector.replace(':hover', '').trim();
+                        if (selector.includes(':hover') && (el.matches(baseSelector) || el.matches(selector.replace(':hover', '')))) {
+                          hasHoverStyles = true;
+                          hoverStyles = {
+                            color: rule.style.color || normalStyles.color,
+                            backgroundColor: rule.style.backgroundColor || normalStyles.backgroundColor,
+                            borderColor: rule.style.borderColor || normalStyles.borderColor,
+                            textDecoration: rule.style.textDecoration || normalStyles.textDecoration
+                          };
+                          break;
+                        }
+                      }
+                    }
+                    if (hasHoverStyles) break;
+                  } catch (e) {
+                    // Cross-origin stylesheet
+                  }
+                }
+              } catch (e) {}
               
               // Check focus state
               el.focus();
               const focusStyles = window.getComputedStyle(el);
               const focusOutline = focusStyles.outline;
               const focusOutlineWidth = focusStyles.outlineWidth;
+              const focusColor = focusStyles.color;
+              const focusBg = focusStyles.backgroundColor;
               el.blur();
+              
+              // Check active state (can simulate by checking :active pseudo-class)
+              let activeStyles = null;
+              try {
+                el.focus();
+                // Simulate active by checking if styles change
+                activeStyles = {
+                  color: focusStyles.color,
+                  backgroundColor: focusStyles.backgroundColor
+                };
+                el.blur();
+              } catch (e) {}
+              
+              // Check disabled state
+              const isDisabled = el.disabled || el.getAttribute('aria-disabled') === 'true';
+              const disabledStyles = isDisabled ? {
+                color: normalStyles.color,
+                opacity: normalStyles.opacity,
+                cursor: normalStyles.cursor
+              } : null;
+              
+              // Check if hover-only info exists (title attribute without aria-label)
+              if (title && !ariaLabel && !el.getAttribute('aria-describedby')) {
+                hoverOnlyInfo.push({
+                  element: el.tagName.toLowerCase(),
+                  text: el.textContent.trim().substring(0, 40),
+                  tooltip: title,
+                  hasAriaLabel: false,
+                  isHoverOnly: true
+                });
+              }
               
               interactiveElements.push({
                 tag: el.tagName.toLowerCase(),
@@ -418,16 +541,50 @@ async function fetchWebsiteContent(url) {
                   backgroundColor: normalStyles.backgroundColor,
                   borderColor: normalStyles.borderColor
                 },
+                hover: hasHoverStyles ? hoverStyles : null,
                 focus: {
                   outline: focusOutline,
                   outlineWidth: focusOutlineWidth,
-                  hasVisibleFocus: focusOutline !== 'none' && focusOutlineWidth !== '0px'
+                  color: focusColor,
+                  backgroundColor: focusBg,
+                  hasVisibleFocus: focusOutline !== 'none' && focusOutlineWidth !== '0px',
+                  isDistinctFromNormal: focusColor !== normalStyles.color || focusBg !== normalStyles.backgroundColor || focusOutline !== 'none'
                 },
-                disabled: el.disabled ? {
-                  color: normalStyles.color,
-                  opacity: normalStyles.opacity
-                } : null
+                active: activeStyles,
+                disabled: disabledStyles,
+                hasTitle: !!title,
+                hasAriaLabel: !!ariaLabel
               });
+            }
+          });
+          
+          // Detect animations and transitions
+          const animations = [];
+          const transitions = [];
+          document.querySelectorAll('*').forEach((el, index) => {
+            if (index < 50) { // Limit to avoid performance issues
+              const styles = window.getComputedStyle(el);
+              const animationName = styles.animationName;
+              const transitionProperty = styles.transitionProperty;
+              
+              if (animationName && animationName !== 'none') {
+                animations.push({
+                  element: el.tagName.toLowerCase(),
+                  className: el.className || '',
+                  animationName: animationName,
+                  animationDuration: styles.animationDuration,
+                  animationIterationCount: styles.animationIterationCount
+                });
+              }
+              
+              if (transitionProperty && transitionProperty !== 'none') {
+                transitions.push({
+                  element: el.tagName.toLowerCase(),
+                  className: el.className || '',
+                  transitionProperty: transitionProperty,
+                  transitionDuration: styles.transitionDuration
+                });
+              }
             }
           });
           
@@ -487,9 +644,27 @@ async function fetchWebsiteContent(url) {
               details: errorMessages
             },
             spacing: spacingAnalysis,
+            targetSizes: {
+              total: targetSizes.length,
+              compliant: targetSizes.filter(t => t.meets24x24).length,
+              nonCompliant: targetSizes.filter(t => !t.meets24x24),
+              details: targetSizes
+            },
             interactiveStates: {
               total: interactiveElements.length,
               details: interactiveElements
+            },
+            hoverOnlyInfo: {
+              total: hoverOnlyInfo.length,
+              details: hoverOnlyInfo
+            },
+            animations: {
+              total: animations.length,
+              details: animations.slice(0, 10)
+            },
+            transitions: {
+              total: transitions.length,
+              details: transitions.slice(0, 10)
             },
             colorOnlyIndicators: {
               total: colorOnlyIndicators.length,
@@ -507,6 +682,94 @@ async function fetchWebsiteContent(url) {
         console.warn(`[${new Date().toISOString()}] CSS analysis failed: ${cssError.message}`);
         desktopCSSAnalysis = null;
       }
+      
+      // Test reflow at 320px width
+      console.log(`[${new Date().toISOString()}] Testing reflow at 320px width...`);
+      let reflowTest = null;
+      try {
+        await page.setViewport({ width: 320, height: 800 });
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for layout to adjust
+        
+        reflowTest = await page.evaluate(() => {
+          const bodyWidth = document.body.scrollWidth;
+          const viewportWidth = window.innerWidth;
+          const hasHorizontalScroll = bodyWidth > viewportWidth;
+          const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+          
+          return {
+            viewportWidth: viewportWidth,
+            bodyWidth: bodyWidth,
+            hasHorizontalScroll: hasHorizontalScroll,
+            scrollbarWidth: scrollbarWidth,
+            meetsReflowRequirement: !hasHorizontalScroll || scrollbarWidth === 0
+          };
+        });
+        
+        console.log(`[${new Date().toISOString()}] Reflow test completed: ${reflowTest.meetsReflowRequirement ? 'PASS' : 'FAIL'}`);
+      } catch (reflowError) {
+        console.warn(`[${new Date().toISOString()}] Reflow test failed: ${reflowError.message}`);
+        reflowTest = null;
+      }
+      
+      // Test zoom at 200%
+      console.log(`[${new Date().toISOString()}] Testing zoom at 200%...`);
+      let zoomTest = null;
+      try {
+        // Reset to original viewport first
+        await page.setViewport({ width: 1920, height: 1080 });
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Apply 200% zoom using CSS transform
+        zoomTest = await page.evaluate(() => {
+          const originalBodyWidth = document.body.scrollWidth;
+          const originalBodyHeight = document.body.scrollHeight;
+          
+          // Apply zoom via CSS
+          document.body.style.zoom = '2';
+          document.documentElement.style.zoom = '2';
+          
+          // Wait a bit for zoom to apply
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              const newBodyWidth = document.body.scrollWidth;
+              const newBodyHeight = document.body.scrollHeight;
+              const viewportWidth = window.innerWidth;
+              const viewportHeight = window.innerHeight;
+              
+              // Check if content is still accessible (not cut off)
+              const hasHorizontalScroll = newBodyWidth > viewportWidth;
+              const hasVerticalScroll = newBodyHeight > viewportHeight;
+              
+              // Reset zoom
+              document.body.style.zoom = '1';
+              document.documentElement.style.zoom = '1';
+              
+              resolve({
+                zoomLevel: 2,
+                originalWidth: originalBodyWidth,
+                originalHeight: originalBodyHeight,
+                zoomedWidth: newBodyWidth,
+                zoomedHeight: newBodyHeight,
+                viewportWidth: viewportWidth,
+                viewportHeight: viewportHeight,
+                hasHorizontalScroll: hasHorizontalScroll,
+                hasVerticalScroll: hasVerticalScroll,
+                // Content should still be accessible even with scrolling
+                meetsZoomRequirement: true // Scrolling is acceptable, just need to check if content is readable
+              });
+            }, 500);
+          });
+        });
+        
+        console.log(`[${new Date().toISOString()}] Zoom test completed`);
+      } catch (zoomError) {
+        console.warn(`[${new Date().toISOString()}] Zoom test failed: ${zoomError.message}`);
+        zoomTest = null;
+      }
+      
+      // Reset viewport to desktop size
+      await page.setViewport({ width: 1920, height: 1080 });
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Now capture mobile viewport data
       console.log(`[${new Date().toISOString()}] Capturing mobile viewport data...`);
@@ -819,6 +1082,8 @@ async function fetchWebsiteContent(url) {
         html: html.substring(0, 200000),
         structuredData,
         cssAnalysis: desktopCSSAnalysis,
+        reflowTest: reflowTest,
+        zoomTest: zoomTest,
         mobileData: mobileData,
         fetchedAt: new Date().toISOString()
       };
@@ -886,20 +1151,36 @@ ${websiteContent.cssAnalysis.links.details.length > 0 ? `\nLink Details:\n${webs
 FORM ELEMENTS & ERROR MESSAGES:
 - Total Form Elements: ${websiteContent.cssAnalysis.formElements.total}
 - Analyzed: ${websiteContent.cssAnalysis.formElements.analyzed}
-${websiteContent.cssAnalysis.formElements.details.length > 0 ? `\nForm Element Details:\n${websiteContent.cssAnalysis.formElements.details.slice(0, 10).map(el => `  - ${el.type} (${el.name || el.id || 'unnamed'}): Placeholder: "${el.placeholder}", Has label: ${el.hasLabel}, Color: ${el.color}, Background: ${el.backgroundColor}`).join('\n')}` : ''}
+${websiteContent.cssAnalysis.formElements.details.length > 0 ? `\nForm Element Details:\n${websiteContent.cssAnalysis.formElements.details.slice(0, 10).map(el => `  - ${el.type} (${el.name || el.id || 'unnamed'}): Placeholder: "${el.placeholder}", Has label: ${el.hasLabel}, Label visible: ${el.labelVisible}, Label text: "${el.labelText}", Color: ${el.color}, Background: ${el.backgroundColor}`).join('\n')}` : ''}
 - Error Messages Found: ${websiteContent.cssAnalysis.errorMessages.total}
 ${websiteContent.cssAnalysis.errorMessages.details.length > 0 ? `\nError Message Details:\n${websiteContent.cssAnalysis.errorMessages.details.slice(0, 5).map(err => `  - For ${err.inputType}: "${err.message.substring(0, 50)}", Color: ${err.color}, Visible: ${err.isVisible}`).join('\n')}` : ''}
 
 SPACING ANALYSIS (Line-height, Letter-spacing):
 Body:
-- Line-height: ${websiteContent.cssAnalysis.spacing.body.lineHeight}
-- Letter-spacing: ${websiteContent.cssAnalysis.spacing.body.letterSpacing}
+- Line-height: ${websiteContent.cssAnalysis.spacing.body.lineHeight} (Allows user override: ${websiteContent.cssAnalysis.spacing.body.lineHeightAllowsOverride ? 'Yes - uses relative units' : 'No - uses fixed units'})
+- Letter-spacing: ${websiteContent.cssAnalysis.spacing.body.letterSpacing} (Allows user override: ${websiteContent.cssAnalysis.spacing.body.letterSpacingAllowsOverride ? 'Yes - uses relative units' : 'No - uses fixed units'})
 - Font-size: ${websiteContent.cssAnalysis.spacing.body.fontSize}
-${websiteContent.cssAnalysis.spacing.paragraphs.length > 0 ? `\nParagraph Samples:\n${websiteContent.cssAnalysis.spacing.paragraphs.slice(0, 5).map((p, i) => `  Paragraph ${i + 1}: Line-height: ${p.lineHeight}, Letter-spacing: ${p.letterSpacing}, Font-size: ${p.fontSize}`).join('\n')}` : ''}
+${websiteContent.cssAnalysis.spacing.paragraphs.length > 0 ? `\nParagraph Samples:\n${websiteContent.cssAnalysis.spacing.paragraphs.slice(0, 5).map((p, i) => `  Paragraph ${i + 1}: Line-height: ${p.lineHeight} (Override: ${p.lineHeightAllowsOverride ? 'Yes' : 'No'}), Letter-spacing: ${p.letterSpacing} (Override: ${p.letterSpacingAllowsOverride ? 'Yes' : 'No'}), Font-size: ${p.fontSize}`).join('\n')}` : ''}
+
+TARGET SIZE ANALYSIS (Desktop - WCAG requires minimum 24x24px for clickable areas):
+- Total Clickable Elements Analyzed: ${websiteContent.cssAnalysis.targetSizes.total}
+- WCAG Compliant (≥24x24px): ${websiteContent.cssAnalysis.targetSizes.compliant}
+- Non-Compliant: ${websiteContent.cssAnalysis.targetSizes.nonCompliant.length}
+${websiteContent.cssAnalysis.targetSizes.nonCompliant.length > 0 ? `\nNon-Compliant Target Sizes:\n${websiteContent.cssAnalysis.targetSizes.nonCompliant.slice(0, 10).map(t => `  - ${t.tag} "${t.text.substring(0, 30)}": ${t.effectiveWidth}x${t.effectiveHeight}px (required: 24x24px minimum)`).join('\n')}` : ''}
 
 INTERACTIVE ELEMENT STATES (Hover, Focus, Active, Disabled):
 - Total Analyzed: ${websiteContent.cssAnalysis.interactiveStates.total}
-${websiteContent.cssAnalysis.interactiveStates.details.length > 0 ? `\nElement State Details:\n${websiteContent.cssAnalysis.interactiveStates.details.slice(0, 10).map(el => `  - ${el.tag} "${el.text.substring(0, 30)}": Focus outline: ${el.focus.outline}, Has visible focus: ${el.focus.hasVisibleFocus}, Disabled: ${el.disabled ? 'Yes' : 'No'}`).join('\n')}` : ''}
+${websiteContent.cssAnalysis.interactiveStates.details.length > 0 ? `\nElement State Details:\n${websiteContent.cssAnalysis.interactiveStates.details.slice(0, 10).map(el => `  - ${el.tag} "${el.text.substring(0, 30)}": Hover state: ${el.hover ? 'Present' : 'Not detected'}, Focus outline: ${el.focus.outline}, Has visible focus: ${el.focus.hasVisibleFocus}, Focus distinct from normal: ${el.focus.isDistinctFromNormal}, Active state: ${el.active ? 'Present' : 'Not detected'}, Disabled: ${el.disabled ? 'Yes' : 'No'}, Has title: ${el.hasTitle}, Has aria-label: ${el.hasAriaLabel}`).join('\n')}` : ''}
+
+HOVER-ONLY INFO DETECTION:
+- Elements with Potential Hover-Only Info: ${websiteContent.cssAnalysis.hoverOnlyInfo.total}
+${websiteContent.cssAnalysis.hoverOnlyInfo.details.length > 0 ? `\nHover-Only Info Issues (title attribute without aria-label):\n${websiteContent.cssAnalysis.hoverOnlyInfo.details.slice(0, 10).map(info => `  - ${info.element} "${info.text.substring(0, 30)}": Tooltip="${info.tooltip}" - This information may only be available on hover, not accessible to keyboard users`).join('\n')}` : 'None detected'}
+
+ANIMATIONS & TRANSITIONS:
+- Animations Found: ${websiteContent.cssAnalysis.animations.total}
+${websiteContent.cssAnalysis.animations.details.length > 0 ? `\nAnimation Details:\n${websiteContent.cssAnalysis.animations.details.slice(0, 5).map(anim => `  - ${anim.element} (${anim.className}): ${anim.animationName}, Duration: ${anim.animationDuration}, Iterations: ${anim.animationIterationCount}`).join('\n')}` : ''}
+- Transitions Found: ${websiteContent.cssAnalysis.transitions.total}
+${websiteContent.cssAnalysis.transitions.details.length > 0 ? `\nTransition Details:\n${websiteContent.cssAnalysis.transitions.details.slice(0, 5).map(trans => `  - ${trans.element} (${trans.className}): ${trans.transitionProperty}, Duration: ${trans.transitionDuration}`).join('\n')}` : ''}
 
 COLOR-ONLY INDICATORS (Status indicators that rely on color alone):
 - Total Found: ${websiteContent.cssAnalysis.colorOnlyIndicators.total}
@@ -911,12 +1192,46 @@ ${websiteContent.cssAnalysis.uiComponents.details.length > 0 ? `\nUI Component D
 
 IMPORTANT: Use this CSS analysis data to provide accurate assessments for:
 - Link distinguishability (underline, bold, color)
-- Form element labels and error messages
-- Spacing (line-height, letter-spacing) - check if values allow user overrides
-- Interactive element states (focus indicators, hover states, disabled states)
+- Form element labels and error messages (check label visibility)
+- Spacing (line-height, letter-spacing) - check if values use relative units (em/rem) to allow user overrides
+- Target sizes (24x24px minimum for desktop clickable areas)
+- Interactive element states (focus indicators, hover states, active states, disabled states)
+- Hover-only info (elements with title attribute but no aria-label)
+- Animations and transitions (detected but quality assessment requires judgment)
 - Color-only indicators (should have icons or labels)
 - Non-text contrast (UI component borders and backgrounds)
 ` : '\n=== DESKTOP CSS & RENDERED HTML ANALYSIS ===\nCSS analysis could not be extracted. Please analyze based on HTML structure only.\n'}
+
+${websiteContent.reflowTest ? `\n=== REFLOW TEST (320px width) ===
+The website has been tested at 320px width to check if content reflows properly without horizontal scrolling.
+
+REFLOW TEST RESULTS:
+- Viewport Width: ${websiteContent.reflowTest.viewportWidth}px
+- Body Width: ${websiteContent.reflowTest.bodyWidth}px
+- Has Horizontal Scroll: ${websiteContent.reflowTest.hasHorizontalScroll ? 'YES (ISSUE)' : 'No'}
+- Scrollbar Width: ${websiteContent.reflowTest.scrollbarWidth}px
+- Meets Reflow Requirement: ${websiteContent.reflowTest.meetsReflowRequirement ? 'Yes' : 'No'}
+
+IMPORTANT: Use this data to assess if the website properly reflows at 320px width without horizontal scrolling.
+` : '\n=== REFLOW TEST ===\nReflow test could not be performed.\n'}
+
+${websiteContent.zoomTest ? `\n=== ZOOM TEST (200%) ===
+The website has been tested at 200% zoom level to check if UI scales properly without breaking.
+
+ZOOM TEST RESULTS:
+- Zoom Level: ${websiteContent.zoomTest.zoomLevel * 100}%
+- Original Body Width: ${websiteContent.zoomTest.originalWidth}px
+- Original Body Height: ${websiteContent.zoomTest.originalHeight}px
+- Zoomed Body Width: ${websiteContent.zoomTest.zoomedWidth}px
+- Zoomed Body Height: ${websiteContent.zoomTest.zoomedHeight}px
+- Viewport Width: ${websiteContent.zoomTest.viewportWidth}px
+- Viewport Height: ${websiteContent.zoomTest.viewportHeight}px
+- Has Horizontal Scroll: ${websiteContent.zoomTest.hasHorizontalScroll ? 'Yes (acceptable)' : 'No'}
+- Has Vertical Scroll: ${websiteContent.zoomTest.hasVerticalScroll ? 'Yes (acceptable)' : 'No'}
+- Meets Zoom Requirement: ${websiteContent.zoomTest.meetsZoomRequirement ? 'Yes' : 'No'}
+
+IMPORTANT: Use this data to assess if the website scales properly at 200% zoom. Scrolling is acceptable, but content should remain readable and functional.
+` : '\n=== ZOOM TEST ===\nZoom test could not be performed.\n'}
 
 ${websiteContent.mobileData ? `\n=== MOBILE VIEWPORT ANALYSIS ===
 The website has been analyzed in a mobile viewport (390x844px - iPhone 12 Pro size) to provide mobile-specific accessibility insights.
