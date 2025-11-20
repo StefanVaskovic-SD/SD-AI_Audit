@@ -1611,27 +1611,17 @@ app.post('/api/audit', async (req, res) => {
         });
       }
 
-      // Try different model names - some may require billing
-      // Start with gemini-2.5-flash (latest flash model), then try others
+      // Try selected model first, then fallback to gemini-2.0-flash if it fails
       let modelName = model || 'gemini-2.5-flash';
       let result;
       let lastError;
       
-      // List of models to try in order
-      const modelsToTry = [
-        'gemini-3-pro-preview', // Latest Pro model (preview)
-        'gemini-2.5-pro',       // Pro model
-        'gemini-2.5-flash',     // Latest Flash model
-        'gemini-2.0-flash'      // Previous version, best performance
-      ];
+      // List of models to try: first the selected one, then fallback to 2.0-flash
+      const modelsToTry = [modelName];
       
-      // If specific model requested, try that first
-      if (model && modelsToTry.includes(model)) {
-        modelsToTry.unshift(model);
-        // Remove duplicate
-        const unique = [...new Set(modelsToTry)];
-        modelsToTry.length = 0;
-        modelsToTry.push(...unique);
+      // If selected model is not 2.0-flash, add it as fallback
+      if (modelName !== 'gemini-2.0-flash') {
+        modelsToTry.push('gemini-2.0-flash');
       }
       
       for (const tryModel of modelsToTry) {
@@ -1657,7 +1647,7 @@ app.post('/api/audit', async (req, res) => {
         } catch (geminiError) {
           console.warn(`[${new Date().toISOString()}] Model ${tryModel} failed: ${geminiError.message}`);
           lastError = geminiError;
-          // Continue to next model
+          // Continue to next model (only gemini-2.0-flash if selected model failed)
         }
       }
       
