@@ -10,6 +10,18 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    @font-face {
+      font-family: 'Suisse';
+      src: url('SuisseIntl-Medium.woff2') format('woff2');
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+    }
+    * {
+      font-family: 'Suisse', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+  </style>
 </head>
 <body style="background-color: #080808; margin: 0; padding: 0;">
   <div id="root"></div>
@@ -66,7 +78,7 @@
       const [auditReport, setAuditReport] = useState(null);
       const [error, setError] = useState('');
       const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
-      const [backendUrl, setBackendUrl] = useState('https://sd-ai-audit.onrender.com');
+      const backendUrl = 'https://sd-ai-audit.onrender.com';
 
       // Store default prompts for reset functionality
       const getDefaultAuditOptions = () => ({
@@ -688,36 +700,84 @@ IMPORTANT:
       };
 
       return (
-        <div className="min-h-screen text-white p-4 md:p-8" style={{ backgroundColor: '#080808' }}>
+        <>
+          <style>{`
+            .main-container {
+              background-color: #080808;
+              background-image: url(bg-desktop.webp);
+              background-size: cover;
+              background-position: center;
+              background-repeat: no-repeat;
+            }
+            @media (max-width: 768px) {
+              .main-container {
+                background-image: url(bg-mobile.webp);
+              }
+            }
+          `}</style>
+          <div 
+            className="min-h-screen text-white p-4 md:p-8 main-container"
+          >
           <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="text-center mb-12">
               <h1 className="text-5xl md:text-6xl font-bold mb-4" style={{ color: '#ffffff' }}>
                 AI Website Audit Tool
               </h1>
-              <p className="text-lg" style={{ color: '#ffffff' }}>
-                Comprehensive UX, Content, and Accessibility Analysis
-              </p>
+            </div>
+
+            {/* Instructions Section */}
+            <div className="rounded-2xl p-6 md:p-8 mb-8 border" style={{ backgroundColor: '#080808', borderColor: '#2e2e30' }}>
+              <div className="mb-6">
+                <p className="text-base md:text-lg mb-4" style={{ color: '#ffffff' }}>
+                  This tool provides an AI-powered audit of any website. It evaluates key aspects of the site, including:
+                </p>
+                <ul className="list-disc list-inside space-y-2 mb-6" style={{ color: '#ffffff' }}>
+                  <li>User Journey Mapping</li>
+                  <li>User Experience (UX)</li>
+                  <li>Content Quality</li>
+                  <li>Accessibility</li>
+                </ul>
+              </div>
+              
+              <div>
+                <h2 className="text-xl font-semibold mb-4" style={{ color: '#ffffff' }}>How to use this tool</h2>
+                <ol className="list-decimal list-inside space-y-3" style={{ color: '#ffffff' }}>
+                  <li className="mb-2">Paste the website URL you want to analyze.</li>
+                  <li className="mb-2">Select an AI model — Gemini Flash is recommended for best performance.</li>
+                  <li className="mb-2">
+                    Adjust the audit criteria (optional):
+                    <p className="ml-6 mt-1 text-sm" style={{ color: '#cccccc' }}>
+                      All criteria are enabled by default. Uncheck any items you don't want included in the analysis.
+                    </p>
+                  </li>
+                  <li className="mb-2">
+                    Edit the default prompts (optional):
+                    <p className="ml-6 mt-1 text-sm" style={{ color: '#cccccc' }}>
+                      You can add additional guidance for the AI. Each criterion includes a default prompt you can customize.
+                    </p>
+                  </li>
+                </ol>
+              </div>
             </div>
 
             {/* URL Input Section */}
-            <div className="rounded-2xl p-6 md:p-8 mb-8 shadow-2xl border" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2 text-gray-300">
-                  Website URL
-                </label>
-                <input
-                  type="url"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://example.com"
-                  className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-white placeholder-gray-500"
-                  style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}
-                  disabled={isAnalyzing}
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className="rounded-2xl p-6 md:p-8 mb-8 shadow-2xl border" style={{ backgroundColor: '#080808', borderColor: '#2e2e30' }}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-300">
+                    Website URL
+                  </label>
+                  <input
+                    type="url"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="https://example.com"
+                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-white placeholder-gray-500"
+                    style={{ backgroundColor: '#080808', borderColor: '#2e2e30' }}
+                    disabled={isAnalyzing}
+                  />
+                </div>
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-300">
                     AI Model
@@ -727,7 +787,7 @@ IMPORTANT:
                     onChange={(e) => setSelectedModel(e.target.value)}
                     disabled={isAnalyzing}
                     className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-white"
-                    style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}
+                    style={{ backgroundColor: '#080808', borderColor: '#2e2e30' }}
                   >
                     <option value="gemini-3-pro-preview">Gemini 3 Pro Preview (Latest Pro)</option>
                     <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
@@ -735,26 +795,16 @@ IMPORTANT:
                     <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recommended)</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-300">
-                    Backend URL
-                  </label>
-                  <input
-                    type="text"
-                    value={backendUrl}
-                    onChange={(e) => setBackendUrl(e.target.value)}
-                    placeholder="https://sd-ai-audit.onrender.com"
-                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-white placeholder-gray-500"
-                  style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}
-                    disabled={isAnalyzing}
-                  />
-                </div>
               </div>
               
               <button
                 onClick={analyzeWebsite}
                 disabled={isAnalyzing || !url}
-                className="w-full px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-medium transition-colors flex items-center justify-center gap-2 shadow-lg"
+                className="w-full px-8 py-4 rounded-full font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+                style={{ 
+                  backgroundColor: isAnalyzing || !url ? '#2e2e30' : '#F5F5F5',
+                  color: isAnalyzing || !url ? '#666666' : '#000000'
+                }}
               >
                 {isAnalyzing ? (
                   <>
@@ -791,7 +841,7 @@ IMPORTANT:
                   const allChecked = checkedCount === totalCount;
 
                   return (
-                    <div key={categoryKey} className="rounded-xl p-6 border" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+                    <div key={categoryKey} className="rounded-xl p-6 border" style={{ backgroundColor: '#080808', borderColor: '#2e2e30' }}>
                       <div 
                         className="flex items-center gap-3 mb-4 cursor-pointer hover:bg-gray-700/50 p-2 rounded-lg transition-colors"
                         onClick={() => toggleCategory(categoryKey)}
@@ -832,7 +882,7 @@ IMPORTANT:
                                   onFocus={(e) => e.stopPropagation()}
                                   placeholder="Add custom prompt instructions for this item..."
                                   className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-white placeholder-gray-500 text-sm resize-y min-h-[80px]"
-                                  style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}
+                                  style={{ backgroundColor: '#080808', borderColor: '#2e2e30' }}
                                 />
                               </div>
                             )}
@@ -871,8 +921,8 @@ IMPORTANT:
                 </div>
 
                 {auditReport.categories.map((category, catIndex) => (
-                        <div key={catIndex} className="rounded-xl p-6 md:p-8 border" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-                    <h3 className="text-2xl font-bold mb-6 pb-4 border-b" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+                        <div key={catIndex} className="rounded-xl p-6 md:p-8 border" style={{ backgroundColor: '#080808', borderColor: '#2e2e30' }}>
+                    <h3 className="text-2xl font-bold mb-6 pb-4 border-b" style={{ borderColor: '#2e2e30' }}>
                       {category.title}
                     </h3>
 
@@ -975,6 +1025,7 @@ IMPORTANT:
             </div>
           </footer>
         </div>
+        </>
       );
     };
 
