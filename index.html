@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Website Audit Tool</title>
+  <link rel="icon" type="image/svg+xml" href="fav-black32.svg">
+  <link rel="apple-touch-icon" href="fav-black-256.svg">
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -18,8 +20,19 @@
       font-style: normal;
       font-display: swap;
     }
+    @font-face {
+      font-family: 'Suisse';
+      src: url('SuisseIntl-Regular.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
     * {
       font-family: 'Suisse', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 400;
+    }
+    h1, h2, h3, h4, h5, h6, .font-semibold, .font-bold, .font-medium {
+      font-weight: 500;
     }
   </style>
 </head>
@@ -729,12 +742,12 @@ IMPORTANT:
             </div>
 
             {/* Instructions Section */}
-            <div className="rounded-2xl p-6 md:p-8 mb-8 border" style={{ backgroundColor: '#080808', borderColor: '#2e2e30' }}>
-              <div className="mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-8">
+              <div className="rounded-2xl p-6 md:p-8 border" style={{ backgroundColor: '#080808', borderColor: '#2e2e30' }}>
                 <p className="text-base md:text-lg mb-4" style={{ color: '#ffffff' }}>
                   This tool provides an AI-powered audit of any website. It evaluates key aspects of the site, including:
                 </p>
-                <ul className="list-disc list-inside space-y-2 mb-6" style={{ color: '#ffffff' }}>
+                <ul className="list-disc list-inside space-y-2" style={{ color: '#ffffff' }}>
                   <li>User Journey Mapping</li>
                   <li>User Experience (UX)</li>
                   <li>Content Quality</li>
@@ -742,7 +755,7 @@ IMPORTANT:
                 </ul>
               </div>
               
-              <div>
+              <div className="rounded-2xl p-6 md:p-8 border" style={{ backgroundColor: '#080808', borderColor: '#2e2e30' }}>
                 <h2 className="text-xl font-semibold mb-4" style={{ color: '#ffffff' }}>How to use this tool</h2>
                 <ol className="list-decimal list-inside space-y-3" style={{ color: '#ffffff' }}>
                   <li className="mb-2">Paste the website URL you want to analyze.</li>
@@ -832,10 +845,7 @@ IMPORTANT:
             {/* Audit Options - Only show when not analyzing and no report */}
             {!isAnalyzing && !auditReport && (
               <div className="space-y-6 mb-8">
-                <h2 className="text-2xl font-bold mb-4">Select Audit Criteria</h2>
-                <p className="text-gray-400 mb-6">
-                  All items are checked by default. Uncheck any items you don't want to analyze.
-                </p>
+                <h2 className="text-2xl font-bold mb-4">Audit criteria</h2>
 
                 {Object.entries(auditOptions).map(([categoryKey, category]) => {
                   const checkedCount = Object.values(category.items).filter(item => item.checked).length;
