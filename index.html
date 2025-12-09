@@ -817,27 +817,45 @@ IMPORTANT:
                 </div>
               </div>
               
-              <button
-                onClick={analyzeWebsite}
-                disabled={isAnalyzing || !url}
-                className="w-full px-8 py-4 rounded-full font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
-                style={{ 
-                  backgroundColor: isAnalyzing || !url ? '#2e2e30' : '#F5F5F5',
-                  color: isAnalyzing || !url ? '#666666' : '#000000'
-                }}
-              >
-                {isAnalyzing ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Analyzing with Gemini...
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-5 h-5" />
-                    Start Audit
-                  </>
+              <div className={`flex gap-4 ${auditReport ? '' : 'flex-col'}`}>
+                <button
+                  onClick={analyzeWebsite}
+                  disabled={isAnalyzing || !url}
+                  className={`px-8 py-4 rounded-full font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed ${auditReport ? 'flex-[0.7]' : 'w-full'}`}
+                  style={{ 
+                    backgroundColor: isAnalyzing || !url ? '#2e2e30' : '#F5F5F5',
+                    color: isAnalyzing || !url ? '#666666' : '#000000'
+                  }}
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Analyzing with Gemini...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-5 h-5" />
+                      Start Audit
+                    </>
+                  )}
+                </button>
+                
+                {auditReport && (
+                  <button
+                    onClick={() => {
+                      setAuditReport(null);
+                      setUrl('');
+                    }}
+                    className="flex-[0.3] px-8 py-4 rounded-full font-medium transition-colors flex items-center justify-center gap-2"
+                    style={{ 
+                      backgroundColor: 'rgba(245, 245, 245, 0.9)',
+                      color: '#000000'
+                    }}
+                  >
+                    New Audit
+                  </button>
                 )}
-              </button>
+              </div>
               
               {error && (
                 <div className="mt-4 p-4 bg-red-900/50 border border-red-500 rounded-lg flex items-start gap-3">
@@ -924,15 +942,6 @@ IMPORTANT:
                     >
                       <Download className="w-4 h-4" />
                       Export PDF
-                    </button>
-                    <button
-                      onClick={() => {
-                        setAuditReport(null);
-                        setUrl('');
-                      }}
-                      className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-                    >
-                      New Audit
                     </button>
                   </div>
                 </div>
