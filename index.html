@@ -820,11 +820,12 @@ IMPORTANT:
               <div className={`flex gap-4 ${auditReport ? '' : 'flex-col'}`}>
                 <button
                   onClick={analyzeWebsite}
-                  disabled={isAnalyzing || !url}
+                  disabled={isAnalyzing || !url || auditReport}
                   className={`px-8 py-4 rounded-full font-medium transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed ${auditReport ? 'flex-[0.7]' : 'w-full'}`}
                   style={{ 
-                    backgroundColor: isAnalyzing || !url ? '#2e2e30' : '#F5F5F5',
-                    color: isAnalyzing || !url ? '#666666' : '#000000'
+                    backgroundColor: isAnalyzing || !url || auditReport ? '#2e2e30' : '#F5F5F5',
+                    color: isAnalyzing || !url || auditReport ? '#666666' : '#000000',
+                    opacity: auditReport ? 0.45 : 1
                   }}
                 >
                   {isAnalyzing ? (
@@ -848,7 +849,7 @@ IMPORTANT:
                     }}
                     className="flex-[0.3] px-8 py-4 rounded-full font-medium transition-colors flex items-center justify-center gap-2"
                     style={{ 
-                      backgroundColor: 'rgba(245, 245, 245, 0.9)',
+                      backgroundColor: '#F5F5F5',
                       color: '#000000'
                     }}
                   >
